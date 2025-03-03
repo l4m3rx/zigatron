@@ -25,7 +25,6 @@ pub const CPU = struct {
     pub fn init(alloc: std.mem.Allocator, ram: *RAM, bus: *BUS) !Self {
         const stack = try alloc.alloc(u16, 16);
         // const pc = @as(u16, &bus[0xFC]) | (@as(u16, &bus[0xFD]) << 8);
-            // .pc = 0xF000,
 
         const c = CPU{
             .a = 0,
@@ -63,7 +62,6 @@ pub const CPU = struct {
     }
 
     pub fn readInstruction(self: *Self) void {
-        // const op1 = self.bus.readCart(self.pc);
         self.opcode = self.bus.read(self.pc);
 
         std.debug.print("C:{d:0>4} PC:0x{X:0>4} OP1:0x{X}\n", .{self.cycles, self.pc, self.opcode});
@@ -85,7 +83,6 @@ pub const CPU = struct {
             0xEA => {
                 self.pcIncrement(1);
                 self.empty_cycles = 2;
-                // self.cycleCounter(2, 1);
             },
             0x18 => { // Clear Carry
                 self.pcIncrement(1);
@@ -99,12 +96,16 @@ pub const CPU = struct {
                 self.pcIncrement(1);
                 self.status = self.status ^ 0b11011111;
             },
+            0x84 => { // STY (Store Index Register Y In Memory)
+                // self.bus.ram.write(self.opcode,  = @intCast(self.opcode);
+            },
             0x85 => { // STA (Store Accumulator)
                 self.pcIncrement(1);
                 self.cycleIncrement(1);
                 self.readInstruction();
                 self.a = @intCast(self.opcode);
                 self.empty_cycles = 2;
+                //  TODO: Status registers
             },
             0xB8 => { // Clear Overflow
                 self.pcIncrement(1);
