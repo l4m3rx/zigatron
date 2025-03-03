@@ -99,6 +99,13 @@ pub const CPU = struct {
                 self.pcIncrement(1);
                 self.status = self.status ^ 0b11011111;
             },
+            0x85 => { // STA (Store Accumulator)
+                self.pcIncrement(1);
+                self.cycleIncrement(1);
+                self.readInstruction();
+                self.a = @intCast(self.opcode);
+                self.empty_cycles = 2;
+            },
             0xB8 => { // Clear Overflow
                 self.pcIncrement(1);
                 self.status = self.status & 0b01000000;
@@ -110,6 +117,13 @@ pub const CPU = struct {
             0xF8 => { // Set Decimal
                 self.pcIncrement(1);
                 self.status = self.status ^ 0b00001000;
+            },
+            0xA6 => { // LDX (Load Index Register X from Memory)
+                self.pcIncrement(1);
+                self.cycleIncrement(1);
+                self.readInstruction();
+                self.x = @intCast(self.opcode);
+                self.empty_cycles = 2;
             },
             0xCA => { // Decremetn X
                 self.empty_cycles = 2;
