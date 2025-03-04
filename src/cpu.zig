@@ -57,6 +57,8 @@ pub const CPU = struct {
 
     pub fn readInstruction(self: *Self) void {
         self.opcode = self.bus.read(self.pc);
+        self.pcIncrement(1);    // Increment PC
+
         std.debug.print("C:{d:0>4} PC:0x{X:0>4} OP1:0x{X}\n", .{self.cycles, self.pc, self.opcode});
         // self.opcode = (self.ram[self.pc] << 8 | self.ram[self.pc + 1]) >> 8;
     }
@@ -71,7 +73,6 @@ pub const CPU = struct {
         }
 
         self.readInstruction(); // Read instruction
-        self.pcIncrement(1);    // Increment PC
 
         // TODO: make this with enums
         switch(self.opcode) {
@@ -93,7 +94,7 @@ pub const CPU = struct {
                 self.status = self.status ^ 0b00000001;
             },
             0x58 => { // CLI (Clear Interrupt Disable)
-                self.status = self.status ^ 0b11011111;
+                self.status = self.status ^ 0b11111011;
             },
             0x84 => { // STY (Store Index Register Y In Memory)
                 // self.bus.ram.write(self.opcode,  = @intCast(self.opcode);
@@ -112,6 +113,22 @@ pub const CPU = struct {
             },
             0xF8 => { // SED (Set Decimal)
                 self.status = self.status ^ 0b00001000;
+            },
+            0xA5 => { // LDA (Load Accumulator ZeroPage)
+                self.readInstruction();
+                const zero_page_addr: u16 = self.opcode;
+
+                self.readInstruction();
+                self.a = @intCast(self.bus.read(zero_page_addr));
+
+                if (self.x == 0) // Set Zero Flag
+                    self.status = self.status ^ 0b00000010;
+
+                if ((self.x & 0b10000000) > 0) // Set Negative Flag
+                    self.status = self.status ^ 0b10000000;
+
+                self.empty_cycles = 2;
+                // TODO: Set flags (N Z)
             },
             0xA6 => { // LDX (Load Index Register X from Memory)
                 self.cycleIncrement(1);
