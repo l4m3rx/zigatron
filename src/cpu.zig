@@ -273,7 +273,33 @@ pub const CPU = struct {
                 self.empty_cycles = 4;
             },
             0x0 => {
-                //self.pcIncrement(1);
+                // Skip the padding byte (PC += 1 beyond the opcode)
+                self.pcIncrement(1);
+
+                // Push PC high byte to stack
+                const pc_high: u8 = @intCast((self.pc >> 8) & 0xFF);
+                self.bus.write(0x0100 + @as(u16, self.sp), pc_high);
+                self.sp -%= 1; // Decrement SP with wrapping
+
+                // Push PC low byte to stack
+                const pc_low: u8 = @intCast(self.pc & 0xFF);
+                self.bus.write(0x0100 + @as(u16, self.sp), pc_low);
+                self.sp -%= 1;
+
+                // Push status register with B flag set (bit 4)
+                const status_with_b = self.status | 0b00010000;
+                self.bus.write(0x0100 + @as(u16, self.sp), status_with_b);
+                self.sp -%= 1;
+
+                // Set the I flag (bit 2)
+                self.status |= 0b00000100;
+
+                // Jump to IRQ vector at $FFFE-$FFFF
+                const irq_low = self.bus.read(0xFFFE);
+                const irq_high = self.bus.read(0xFFFF);
+                self.pc = (@as(u16, irq_high) << 8) | irq_low;
+
+                self.empty_cycles = 6;
             },
             else => {
                 std.debug.print("[warn] Unimplemented instruction 0x{X}\n", .{self.opcode});
