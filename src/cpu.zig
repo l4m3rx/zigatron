@@ -94,10 +94,10 @@ pub const CPU = struct {
                 // self.bus.ram.write(self.opcode,  = @intCast(self.opcode);
             },
             0x85 => { // STA (Store Accumulator)
-                self.cycleIncrement(1);
+                // self.cycleIncrement(1);
                 self.readInstruction();
                 self.a = @intCast(self.opcode);
-                self.empty_cycles = 2;
+                self.empty_cycles = 3;
                 //  TODO: Status registers
             },
             0xB8 => { // Clear Overflow
