@@ -1,5 +1,4 @@
 const std = @import("std");
-const RAM = @import("mem.zig").RAM;
 const BUS = @import("bus.zig").BUS;
 
 pub const CPU = struct {
@@ -11,7 +10,6 @@ pub const CPU = struct {
     pc: u16,    // Program counter
     status: u8, // Status flags
 
-    ram: *RAM,
     bus: *BUS,
 
     opcode: u16,
@@ -22,7 +20,7 @@ pub const CPU = struct {
 
     const Self = @This();
 
-    pub fn init(alloc: std.mem.Allocator, ram: *RAM, bus: *BUS) !Self {
+    pub fn init(alloc: std.mem.Allocator, bus: *BUS) !Self {
         const stack = try alloc.alloc(u16, 16);
         // const pc = @as(u16, &bus[0xFC]) | (@as(u16, &bus[0xFD]) << 8);
 
@@ -30,7 +28,6 @@ pub const CPU = struct {
             .a = 0,
             .x = 0,
             .y = 0,
-            .ram = ram,
             .bus = bus,
             .sp = 0xFF,
             .cycles = 0,
