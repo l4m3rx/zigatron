@@ -61,6 +61,44 @@ pub const CPU = struct {
         std.debug.print("C:{d:0>4} PC:0x{X:0>4} OP1:0x{X}\n", .{self.cycles, self.pc, self.opcode});
     }
 
+    pub fn interruptBit(self: *Self, b: bool) void {
+        if (!b)
+            self.status = self.status & 0b00000100;
+    }
+
+    pub fn overflowBit(self: *Self, b: bool) void {
+        if (!b)
+            self.status = self.status & 0b01000000;
+    }
+
+    pub fn decimalBit(self: *Self, b: bool) void {
+        if (b)
+            self.status = self.status ^ 0b00001000
+        else
+            self.status = self.status & 0b00001000;
+    }
+
+    pub fn carryBit(self: *Self, b: bool) void {
+        if (b)
+            self.status = self.status ^ 0b00000001
+        else
+            self.status = self.status & 0b11111110;
+    }
+
+    pub fn negativeBit(self: *Self, b: bool) void {
+        if (b)
+            self.status = self.status ^ 0b10000000
+        else
+            self.status = self.status & 0b01111111;
+    }
+
+    pub fn zeroBit(self: *Self, b: bool) void {
+        if (b)
+            self.status = self.status ^ 0b00000010
+        else
+            self.status = self.status & 0b11111101;
+    }
+
     pub fn cycle(self: *Self) void {
         self.cycleIncrement(1); // Increment cycle counter
         // Sleep few cycles if we need to act busy
@@ -79,17 +117,17 @@ pub const CPU = struct {
             },
             0x0A => { // ASL (Arithmetic Shift Left)
                 if ((self.a & 0b10000000) > 0) {
-                    self.status = self.status ^ 0b00000001;
+                    self.negativeBit(true);
                     self.a = self.a ^ 0b10000000; // Drop highest bit TODO: double check this
                 }
                 self.a = self.a << 1;
                 self.empty_cycles = 1;
             },
             0x18 => { // CLC (Clear Carry)
-                self.status = self.status & 0b11111110;
+                self.carryBit(false);
             },
             0x38 => { // SEC (Set Carry)
-                self.status = self.status ^ 0b00000001;
+                self.carryBit(true);
             },
             0x44 => { // DEC (Decrement memory)
                 self.readInstruction();
@@ -98,14 +136,14 @@ pub const CPU = struct {
                 self.bus.write(self.opcode, data-1);
 
                 if (data == 1) {
-                    self.status = self.status ^ 0b00000010;
+                    self.zeroBit(true);
                 } else if (data == 0) {
-                    self.status = self.status ^ 0b10000000;
+                    self.negativeBit(true);
                 }
                 self.empty_cycles = 4;
             },
             0x58 => { // CLI (Clear Interrupt Disable)
-                self.status = self.status ^ 0b11111011;
+                self.interruptBit(false);
             },
             0x84 => { // STY (Store Index Register Y In Memory)
                 // self.bus.ram.write(self.opcode,  = @intCast(self.opcode);
@@ -117,13 +155,26 @@ pub const CPU = struct {
                 //  TODO: Status registers
             },
             0xB8 => { // CLV (Clear Overflow)
-                self.status = self.status & 0b01000000;
+                self.overflowBit(false);
             },
             0xD8 => { // CLD (Clear Decimal)
-                self.status = self.status & 0b00001000;
+                self.decimalBit(false);
             },
             0xF8 => { // SED (Set Decimal)
-                self.status = self.status ^ 0b00001000;
+                self.decimalBit(true);
+            },
+            0xA2 => { // LDX (Load X register Immidate)
+                self.readInstruction();
+                self.x = @intCast(self.opcode);
+
+                // Set Zero Flag
+                if (self.x == 0)
+                    self.zeroBit(true);
+                // Set Negative Flag
+                if ((self.x & 0b10000000) > 0)
+                    self.negativeBit(true);
+
+                self.empty_cycles = 2;
             },
             0xA5 => { // LDA (Load Accumulator ZeroPage)
                 self.readInstruction();
@@ -132,21 +183,27 @@ pub const CPU = struct {
                 self.readInstruction();
                 self.a = @intCast(self.bus.read(zero_page_addr));
 
-                if (self.x == 0) // Set Zero Flag
-                    self.status = self.status ^ 0b00000010;
-
-                if ((self.x & 0b10000000) > 0) // Set Negative Flag
-                    self.status = self.status ^ 0b10000000;
+                // Set Zero Flag
+                if (self.x == 0)
+                    self.zeroBit(true);
+                // Set Negative Flag
+                if ((self.x & 0b10000000) > 0)
+                    self.negativeBit(true);
 
                 self.empty_cycles = 2;
-                // TODO: Set flags (N Z)
             },
             0xA6 => { // LDX (Load Index Register X from Memory)
-                self.cycleIncrement(1);
                 self.readInstruction();
                 self.x = @intCast(self.opcode);
+
+                // Set Zero Flag
+                if (self.x == 0)
+                    self.zeroBit(true);
+                // Set Negative Flag
+                if ((self.x & 0b10000000) > 0)
+                    self.negativeBit(true);
+
                 self.empty_cycles = 2;
-                // TODO: Set flags (N Z)
             },
             0xCA => { // DEX (Decremetn X)
                 self.empty_cycles = 2;
@@ -154,21 +211,26 @@ pub const CPU = struct {
                     self.x = self.x - 1
                 else
                     std.debug.print("[error] Cannot decrement X register  [current:{}]\n", .{self.x});
-
+                // Set Zero Flag
                 if (self.x > 0)
-                    self.status = self.status & 0b01000000; // Clear Zero flag
-
-                // TODO: FIX
-                // if (self.x & 128)
-                //     self.status = self.status & 0b00000001; // Set Negative flag
+                    self.zeroBit(false);
+                // Set Negative Flag
+                if ((self.x & 0b10000000) > 0)
+                    self.negativeBit(true);
             },
             0xE8 => { // INX (Increment X)
+                if (self.x < 0xFF) {
+                    self.x = self.x + 1;
+                } else {
+                    self.x = 0;
+                    self.overflowBit(true);
+                    self.zeroBit(true);
+                }
+                // Set Negative Flag
+                if ((self.x & 0b10000000) > 0)
+                    self.negativeBit(true);
+
                 self.empty_cycles = 2;
-                if (self.x < 0xFF)
-                    self.x = self.x + 1
-                else
-                    std.debug.print("[error] Cannot increment X register  [current:{}]\n", .{self.x});
-                // TODO: Flags
             },
             0x4C => { // JMP (Absolute Jump)
                 const op1: u16 = self.bus.read(self.pc);
@@ -177,8 +239,9 @@ pub const CPU = struct {
                 const op2: u16 = self.bus.read(self.pc);
 
                 self.pc = op1 << 8 | op2;
-                std.debug.print("Jumping to address 0x{X}\n", .{self.pc});
+
                 self.empty_cycles = 2;
+                std.debug.print("Jumping to address 0x{X}\n", .{self.pc});
             },
             0x6C => { // Indirect Jump
                 // 5 cycles
