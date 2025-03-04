@@ -213,28 +213,4 @@ pub const CPU = struct {
         }
     }
 
-    pub fn cycleCounter(self: *Self, c: u16, p: u16) void {
-        var pc: u32 = @intCast(self.pc);
-        var cycles: u32 = @intCast(self.cycles);
-
-        const pp: u32 = @intCast(p);
-        const cc: u32 = @intCast(c);
-
-        const max_pc: u32 = 0xFFFF;
-        const max_cycles: u32 = 0xFFFFFFFF;
-
-        if ((pc + p) > 0xFFFF) {
-            pc = (pc + pp) % max_pc;
-            self.pc = @intCast(pc);
-        } else {
-            self.pc = self.pc + p;
-        }
-
-        if ((cycles + c) > 0xFFFFFFFF) {
-            cycles = (cycles + cc) % max_cycles;
-            self.cycles = @intCast(cycles);
-        } else {
-            self.cycles = self.cycles + c;
-        }
-    }
 };
