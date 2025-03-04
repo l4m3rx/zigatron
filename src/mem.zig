@@ -21,7 +21,7 @@ pub const RAM = struct {
 
     pub fn read(self: *RAM, address: u16) u8 {
         if ((address >= 0x0) and (address <= self.size)) {
-            std.debug.print("[info] Reading address: 0x{X}\n", .{ address });
+            // std.debug.print("[info] Reading address: 0x{X}\n", .{ address });
             return self.ram[address];
         } else {
             std.debug.print("[error] Address out of range 0x{X}\n", .{ address });
@@ -30,7 +30,7 @@ pub const RAM = struct {
     }
 
     pub fn write(self: *RAM, address: u16, value: u8) void {
-        std.debug.print("Writing to address: 0x{X}={d}\n", .{ address, value });
+        // std.debug.print("Writing to address: 0x{X}={d}\n", .{ address, value });
         self.ram[address] = value;
     }
 

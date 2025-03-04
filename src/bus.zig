@@ -30,7 +30,7 @@ pub const BUS = struct {
     }
 
     pub fn readRam(self: *BUS, addr: u16) u8 {
-        std.debug.print("Read RAM address: 0x{X:0>4}\n", .{addr});
+        // std.debug.print("Read RAM address: 0x{X:0>4}\n", .{addr});
         return self.car.read(addr);
     }
 
