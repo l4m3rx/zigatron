@@ -134,7 +134,7 @@ pub const CPU = struct {
                     self.pc = @intCast(wide + offset);
 
                     // Check for page boundary crossing
-                    if ((wide & 0xFF00) != (wide & 0xFF00)) {
+                    if ((wide & 0xFF00) != (self.pc & 0xFF00)) {
                         self.empty_cycles = 3;
                     } else {
                         self.empty_cycles = 2;
@@ -340,6 +340,27 @@ pub const CPU = struct {
                     self.empty_cycles = 4;
                 } else {
                     self.empty_cycles = 3;
+                }
+            },
+            0xD0 => { // BNE
+                // Read the signed 16-bit offset
+                const offset: i16 = @intCast(self.bus.read(self.pc));
+                self.pcIncrement(1);
+
+                // Check if zero flag is clear (bit 1 of status is 0)
+                if ((self.status & 0x02) == 0) {
+                    const wide: i32 = self.pc;
+                    // Add offset to PC with 16-bit wrapping
+                    self.pc = @intCast(wide + offset);
+
+                    // Check if page boundary is crossed
+                    if ((wide & 0xFF00) != (self.pc & 0xFF00)) {
+                        self.empty_cycles = 3;
+                    } else {
+                        self.empty_cycles = 2;
+                    }
+                } else {
+                    self.empty_cycles = 1;
                 }
             },
             0x0 => {
