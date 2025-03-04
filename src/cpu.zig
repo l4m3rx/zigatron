@@ -272,6 +272,29 @@ pub const CPU = struct {
 
                 self.empty_cycles = 4;
             },
+            0xBD => { // LDA Absolute,X
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                // Form the 16-bit base address (little-endian)
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr + @as(u16, self.x);
+
+                const value = self.bus.read(effective_addr);
+                self.a = value;
+
+                self.zeroBit(value == 0);
+                self.negativeBit((value & 0x80) != 0);
+
+                const temp = @as(u16, low) + @as(u16, self.x);
+                if (temp > 0xFF) {
+                    self.empty_cycles = 4;
+                } else {
+                    self.empty_cycles = 3;
+                }
+            },
             0x0 => {
                 // Skip the padding byte (PC += 1 beyond the opcode)
                 self.pcIncrement(1);
