@@ -125,6 +125,24 @@ pub const CPU = struct {
 
                 self.empty_cycles = 1;
             },
+            0x10 => { // BPL
+                const offset: i8 = @bitCast(self.bus.read(self.pc));
+                self.pcIncrement(1);
+
+                if ((self.status & 0x80) == 0) {
+                    const wide: i32 = self.pc;
+                    self.pc = @intCast(wide + offset);
+
+                    // Check for page boundary crossing
+                    if ((wide & 0xFF00) != (wide & 0xFF00)) {
+                        self.empty_cycles = 3;
+                    } else {
+                        self.empty_cycles = 2;
+                    }
+                } else {
+                    self.empty_cycles = 1;
+                }
+            },
             0x18 => { // CLC (Clear Carry)
                 self.carryBit(false);
             },
@@ -271,6 +289,21 @@ pub const CPU = struct {
                 self.pc = (@as(u16, target_high) << 8) | target_low;
 
                 self.empty_cycles = 4;
+            },
+            0xAC => { // LDY Absolute
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const addr = (@as(u16, high) << 8) | low;
+                const value = self.bus.read(addr);
+                self.y = value;
+
+                self.zeroBit(value == 0);
+                self.negativeBit((value & 0x80) != 0);
+
+                self.empty_cycles = 3;
             },
             0xAD => { // LDA Absolute
                 const low = self.bus.read(self.pc);
