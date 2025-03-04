@@ -146,6 +146,26 @@ pub const CPU = struct {
             0x18 => { // CLC (Clear Carry)
                 self.carryBit(false);
             },
+            0x20 => { // JSR Absolute
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const return_addr = self.pc;
+                const temp_sp: u16 = self.sp;
+                const sp_addr: u16 = 0x100 + temp_sp;
+
+                self.bus.write(sp_addr, @intCast((return_addr >> 8) & 0xFF));
+                self.sp -%= 1;
+
+                self.bus.write(sp_addr, @intCast(return_addr & 0xFF));
+                self.sp -%= 1;
+
+                self.pc = (@as(u16, high) << 8) | low;
+
+                self.empty_cycles = 5;
+            },
             0x38 => { // SEC (Set Carry)
                 self.carryBit(true);
             },
@@ -165,6 +185,10 @@ pub const CPU = struct {
             0x58 => { // CLI (Clear Interrupt Disable)
                 self.interruptBit(false);
             },
+            0x78 => { // SEI
+                self.status |= 0x04; // Set interrupt disable flag (bit 2)
+                self.empty_cycles = 1;
+            },
             0x84 => { // STY (Store Index Register Y In Memory) TODO: CONFIRM
                 const addr = self.bus.read(self.pc); // Zero-page address
 
@@ -181,6 +205,15 @@ pub const CPU = struct {
 
                 self.empty_cycles = 2;
             },
+            0x94 => { // STY Zero Page, X
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const effective_addr = zp_addr +% self.x;
+                self.bus.write(effective_addr, self.y);
+
+                self.empty_cycles = 3;
+            },
             0x95 => { // STA (Store Accumulator, X)
                 const base_addr: u16 = self.bus.read(self.pc);
                 self.pcIncrement(1);
@@ -190,6 +223,11 @@ pub const CPU = struct {
 
                 self.empty_cycles = 3;
             },
+            0x9A => { // TXS - Transfer X to Stack Pointer
+                self.sp = self.x;
+
+                self.empty_cycles = 1;
+            },
             0xB8 => { // CLV (Clear Overflow)
                 self.overflowBit(false);
             },
@@ -198,6 +236,16 @@ pub const CPU = struct {
             },
             0xF8 => { // SED (Set Decimal)
                 self.decimalBit(true);
+            },
+            0xA0 => { // LDY Immediate
+                const value = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                self.y = value;
+
+                self.zeroBit(value == 0);
+                self.negativeBit((value & 0x80) != 0); // Set negative flag if bit 7 is 1
+
+                self.empty_cycles = 1;
             },
             0xA2 => { // LDX (Load X register Immidate)
                 self.readInstruction();
@@ -370,6 +418,47 @@ pub const CPU = struct {
                 } else {
                     self.empty_cycles = 1;
                 }
+            },
+            0xE9 => { // SBC Immediate
+                const operand = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const carry = (self.status & 0x01) != 0;
+                const a = self.a;
+
+                const borrow: u8 = if (carry) 0 else 1;
+                const result = a -% operand -% borrow;
+                self.a = result;
+
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+                self.carryBit(a >= (operand +% borrow));
+
+                // Overflow: (A positive, operand negative) or (A negative, operand positive) crossing zero
+                const overflow = ((a ^ result) & (a ^ operand) & 0x80) != 0;
+                if (overflow) {
+                    self.status |= 0x40; // Set overflow flag (bit 6)
+                } else {
+                    self.status &= ~@as(u8, 0x40); // Clear overflow flag
+                }
+
+                // 2 cycles total (opcode + 1 additional)
+                self.empty_cycles = 1;
+            },
+            0xF6 => { // INC Zero Page, X
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const effective_addr: u8 = @intCast(zp_addr +% self.x);
+                const value = self.bus.read(effective_addr);
+                const new_value = value +% 1;
+
+                self.bus.write(effective_addr, new_value);
+
+                self.zeroBit(new_value == 0);
+                self.negativeBit((new_value & 0x80) != 0);
+
+                self.empty_cycles = 5;
             },
             0x0 => {
                 // Skip the padding byte (PC += 1 beyond the opcode)
