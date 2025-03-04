@@ -58,9 +58,7 @@ pub const CPU = struct {
     pub fn readInstruction(self: *Self) void {
         self.opcode = self.bus.read(self.pc);
         self.pcIncrement(1);    // Increment PC
-
         std.debug.print("C:{d:0>4} PC:0x{X:0>4} OP1:0x{X}\n", .{self.cycles, self.pc, self.opcode});
-        // self.opcode = (self.ram[self.pc] << 8 | self.ram[self.pc + 1]) >> 8;
     }
 
     pub fn cycle(self: *Self) void {
@@ -71,8 +69,8 @@ pub const CPU = struct {
             self.empty_cycles = self.empty_cycles - 1;
             return;
         }
-
-        self.readInstruction(); // Read instruction
+        // Read next instruction
+        self.readInstruction();
 
         // TODO: make this with enums
         switch(self.opcode) {
@@ -92,6 +90,19 @@ pub const CPU = struct {
             },
             0x38 => { // SEC (Set Carry)
                 self.status = self.status ^ 0b00000001;
+            },
+            0x44 => { // DEC (Decrement memory)
+                self.readInstruction();
+
+                const data = self.bus.readRam(self.opcode);
+                self.bus.write(self.opcode, data-1);
+
+                if (data == 1) {
+                    self.status = self.status ^ 0b00000010;
+                } else if (data == 0) {
+                    self.status = self.status ^ 0b10000000;
+                }
+                self.empty_cycles = 4;
             },
             0x58 => { // CLI (Clear Interrupt Disable)
                 self.status = self.status ^ 0b11111011;
@@ -191,11 +202,11 @@ pub const CPU = struct {
         const pp: u32 = @intCast(p);
         const max_pc: u32 = 0xFFFF;
 
-        if ((pc + p) > 0xFFFF) {
+        if ((pc + p) <= 0xFFFF) {
+            self.pc = self.pc + p;
+        } else {
             pc = (pc + pp) % max_pc;
             self.pc = @intCast(pc);
-        } else {
-            self.pc = self.pc + p;
         }
     }
 
@@ -205,11 +216,11 @@ pub const CPU = struct {
         const cc: u32 = @intCast(c);
         const max_cycles: u32 = 0xFFFFFFFF;
 
-        if ((cycles + c) > 0xFFFFFFFF) {
+        if ((cycles + c) <= 0xFFFFFFFF) {
+            self.cycles = self.cycles + c;
+        } else {
             cycles = (cycles + cc) % max_cycles;
             self.cycles = @intCast(cycles);
-        } else {
-            self.cycles = self.cycles + c;
         }
     }
 
