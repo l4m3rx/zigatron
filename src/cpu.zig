@@ -272,12 +272,26 @@ pub const CPU = struct {
 
                 self.empty_cycles = 4;
             },
+            0xAD => { // LDA Absolute
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                // Form the 16-bit address (little-endian)
+                const addr = (@as(u16, high) << 8) | low;
+                const value = self.bus.read(addr);
+                self.a = value;
+
+                self.zeroBit(value == 0);
+                self.negativeBit((value & 0x80) != 0);
+
+                self.empty_cycles = 3;
+            },
             0xBD => { // LDA Absolute,X
                 const low = self.bus.read(self.pc);
                 self.pcIncrement(1);
                 const high = self.bus.read(self.pc);
                 self.pcIncrement(1);
-
                 // Form the 16-bit base address (little-endian)
                 const base_addr = (@as(u16, high) << 8) | low;
                 const effective_addr = base_addr + @as(u16, self.x);
