@@ -61,7 +61,7 @@ pub const BUS = struct {
         else if ((addr >= 0xE000) and (addr <= 0x1FFF))
             self.bus[addr] = data
         else
-            std.debug.print("[warn]: Unexpected write address request [Address: 0x{X}]", .{addr});
+            std.debug.print("[warn]: Unexpected write address request [Address: 0x{X}]\n", .{addr});
             return;
     }
 };

@@ -116,11 +116,13 @@ pub const CPU = struct {
                 self.empty_cycles = 1;
             },
             0x0A => { // ASL (Arithmetic Shift Left)
-                if ((self.a & 0b10000000) > 0) {
-                    self.negativeBit(true);
-                    self.a = self.a ^ 0b10000000; // Drop highest bit TODO: double check this
-                }
+                const carry = (self.a & 0x80) != 0;
                 self.a = self.a << 1;
+                self.carryBit(carry);
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
                 self.empty_cycles = 1;
             },
             0x18 => { // CLC (Clear Carry)
@@ -145,14 +147,21 @@ pub const CPU = struct {
             0x58 => { // CLI (Clear Interrupt Disable)
                 self.interruptBit(false);
             },
-            0x84 => { // STY (Store Index Register Y In Memory)
-                // self.bus.ram.write(self.opcode,  = @intCast(self.opcode);
+            0x84 => { // STY (Store Index Register Y In Memory) TODO: CONFIRM
+                const addr = self.bus.read(self.pc); // Zero-page address
+
+                self.pcIncrement(1);
+                self.bus.write(addr, self.y);
+
+                self.empty_cycles = 2;
             },
             0x85 => { // STA (Store Accumulator)
-                self.readInstruction();
-                self.a = @intCast(self.opcode);
-                self.empty_cycles = 3;
-                //  TODO: Status registers
+                const addr = self.bus.read(self.pc);
+
+                self.pcIncrement(1);
+                self.bus.write(addr, self.a);
+
+                self.empty_cycles = 2;
             },
             0xB8 => { // CLV (Clear Overflow)
                 self.overflowBit(false);
@@ -167,80 +176,73 @@ pub const CPU = struct {
                 self.readInstruction();
                 self.x = @intCast(self.opcode);
 
-                // Set Zero Flag
-                if (self.x == 0)
-                    self.zeroBit(true);
-                // Set Negative Flag
-                if ((self.x & 0b10000000) > 0)
-                    self.negativeBit(true);
+                self.zeroBit(self.x == 0);
+                self.negativeBit((self.x & 0x80) != 0);
 
-                self.empty_cycles = 2;
+                self.empty_cycles = 1;
             },
             0xA5 => { // LDA (Load Accumulator ZeroPage)
-                self.readInstruction();
-                const zero_page_addr: u16 = self.opcode;
+                const addr = self.bus.read(self.pc);
 
-                self.readInstruction();
-                self.a = @intCast(self.bus.read(zero_page_addr));
+                self.pcIncrement(1);
+                self.a = self.bus.read(addr);
 
-                // Set Zero Flag
-                if (self.x == 0)
-                    self.zeroBit(true);
-                // Set Negative Flag
-                if ((self.x & 0b10000000) > 0)
-                    self.negativeBit(true);
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
 
                 self.empty_cycles = 2;
             },
             0xA6 => { // LDX (Load Index Register X from Memory)
-                self.readInstruction();
-                self.x = @intCast(self.opcode);
-
-                // Set Zero Flag
-                if (self.x == 0)
-                    self.zeroBit(true);
-                // Set Negative Flag
-                if ((self.x & 0b10000000) > 0)
-                    self.negativeBit(true);
-
-                self.empty_cycles = 2;
-            },
-            0xCA => { // DEX (Decremetn X)
-                self.empty_cycles = 2;
-                if (self.x > 0)
-                    self.x = self.x - 1
-                else
-                    std.debug.print("[error] Cannot decrement X register  [current:{}]\n", .{self.x});
-                // Set Zero Flag
-                if (self.x > 0)
-                    self.zeroBit(false);
-                // Set Negative Flag
-                if ((self.x & 0b10000000) > 0)
-                    self.negativeBit(true);
-            },
-            0xE8 => { // INX (Increment X)
-                if (self.x < 0xFF) {
-                    self.x = self.x + 1;
-                } else {
-                    self.x = 0;
-                    self.overflowBit(true);
-                    self.zeroBit(true);
-                }
-                // Set Negative Flag
-                if ((self.x & 0b10000000) > 0)
-                    self.negativeBit(true);
-
-                self.empty_cycles = 2;
-            },
-            0x4C => { // JMP (Absolute Jump)
-                const op1: u16 = self.bus.read(self.pc);
+                const addr = self.bus.read(self.pc);
 
                 self.pcIncrement(1);
-                const op2: u16 = self.bus.read(self.pc);
+                self.x = self.bus.read(addr);
 
-                self.pc = op1 << 8 | op2;
+                self.zeroBit(self.x == 0);
+                self.negativeBit((self.x & 0x80) != 0);
 
                 self.empty_cycles = 2;
+            },
+            0xC6 => { // DEC Zero Page (replacing 0x44)
+                const addr = self.bus.read(self.pc); // Zero-page address
+                self.pcIncrement(1);
+
+                const value = self.bus.read(addr);
+                const result = value - 1;
+                self.bus.write(addr, result);
+
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                self.empty_cycles = 4;
+            },
+            0xCA => { // DEX (Decremetn X)
+                self.x -%= 1; // Wrapping subtraction
+                              //
+                self.zeroBit(self.x == 0);
+                self.negativeBit((self.x & 0x80) != 0);
+
+                self.empty_cycles = 1;
+            },
+            0xE8 => { // INX (Increment X)
+                self.x +%= 1;
+
+                self.zeroBit(self.x == 0);
+                self.negativeBit((self.x & 0x80) != 0);
+
+                self.empty_cycles = 1;
+            },
+            0x4C => { // JMP (Absolute Jump)
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                // self.pc = (high << 8) | low;
+                self.pc = (@as(u16, high) << 8) | low;
+
+                self.empty_cycles = 1;
                 std.debug.print("Jumping to address 0x{X}\n", .{self.pc});
             },
             0x6C => { // Indirect Jump
