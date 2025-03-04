@@ -56,9 +56,9 @@ pub const BUS = struct {
     }
 
     pub fn write(self: *BUS, addr: u16, data: u8) void {
-        if ((addr >= 0) & (addr <= 0x007F))
+        if ((addr >= 0) and (addr <= 0x007F))
             self.ram.write(addr, data)
-        else if ((addr >= 0xE000) & (addr <= 0x1FFF))
+        else if ((addr >= 0xE000) and (addr <= 0x1FFF))
             self.bus[addr] = data
         else
             std.debug.print("[warn]: Unexpected write address request [Address: 0x{X}]", .{addr});
