@@ -12,11 +12,10 @@ pub const CPU = struct {
 
     bus: *BUS,
 
-    opcode: u16,
-    stack: []u16,
-
-    cycles: u32,
-    empty_cycles: u32,
+    opcode: u16,  // Current OPCode
+    stack: []u16, // Stack array
+    cycles: u32,  // Cycles counter
+    empty_cycles: u32, // Cycles to sleep as if we're busy
 
     const Self = @This();
 
@@ -58,34 +57,34 @@ pub const CPU = struct {
 
     pub fn readInstruction(self: *Self) void {
         self.opcode = self.bus.read(self.pc);
-
         std.debug.print("C:{d:0>4} PC:0x{X:0>4} OP1:0x{X}\n", .{self.cycles, self.pc, self.opcode});
         // self.opcode = (self.ram[self.pc] << 8 | self.ram[self.pc + 1]) >> 8;
     }
 
     pub fn cycle(self: *Self) void {
-        self.cycleIncrement(1);
-
+        self.cycleIncrement(1); // Increment cycle counter
+        // Sleep few cycles if we need to act busy
+        // simulating multi cycle instruction execution
         if (self.empty_cycles > 0) {
             self.empty_cycles = self.empty_cycles - 1;
             return;
         }
 
-        self.readInstruction();
-        self.pcIncrement(1);
+        self.readInstruction(); // Read instruction
+        self.pcIncrement(1);    // Increment PC
 
         // TODO: make this with enums
         switch(self.opcode) {
             0xEA => {
                 self.empty_cycles = 2;
             },
-            0x18 => { // Clear Carry
+            0x18 => { // CLC (Clear Carry)
                 self.status = self.status & 0b11111110;
             },
-            0x38 => { // Set Carry
+            0x38 => { // SEC (Set Carry)
                 self.status = self.status ^ 0b00000001;
             },
-            0x58 => { // Clear Interrupt Disable
+            0x58 => { // CLI (Clear Interrupt Disable)
                 self.status = self.status ^ 0b11011111;
             },
             0x84 => { // STY (Store Index Register Y In Memory)
@@ -98,13 +97,13 @@ pub const CPU = struct {
                 self.empty_cycles = 3;
                 //  TODO: Status registers
             },
-            0xB8 => { // Clear Overflow
+            0xB8 => { // CLV (Clear Overflow)
                 self.status = self.status & 0b01000000;
             },
-            0xD8 => { // Clear Decimal
+            0xD8 => { // CLD (Clear Decimal)
                 self.status = self.status & 0b00001000;
             },
-            0xF8 => { // Set Decimal
+            0xF8 => { // SED (Set Decimal)
                 self.status = self.status ^ 0b00001000;
             },
             0xA6 => { // LDX (Load Index Register X from Memory)
@@ -127,23 +126,22 @@ pub const CPU = struct {
                 // if (self.x & 128)
                 //     self.status = self.status & 0b00000001; // Set Negative flag
             },
-            0xE8 => { // Increment X
+            0xE8 => { // INX (Increment X)
                 self.empty_cycles = 2;
                 if (self.x < 0xFF)
                     self.x = self.x + 1
                 else
                     std.debug.print("[error] Cannot increment X register  [current:{}]\n", .{self.x});
             },
-            0x4C => { // Absolute Jump (3 cycles)
-                self.cycleIncrement(1);
+            0x4C => { // JMP (Absolute Jump)
                 const op1: u16 = self.bus.read(self.pc);
 
                 self.pcIncrement(1);
-                self.cycleIncrement(1);
                 const op2: u16 = self.bus.read(self.pc);
 
                 self.pc = op1 << 8 | op2;
                 std.debug.print("Jumping to address 0x{X}\n", .{self.pc});
+                self.empty_cycles = 2;
             },
             0x6C => { // Indirect Jump
                 // 5 cycles
