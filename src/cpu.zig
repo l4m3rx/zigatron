@@ -182,11 +182,11 @@ pub const CPU = struct {
                 self.empty_cycles = 2;
             },
             0x95 => { // STA (Store Accumulator, X)
-                const base_addr = self.bus.read(self.pc);
+                const base_addr: u16 = self.bus.read(self.pc);
                 self.pcIncrement(1);
 
-                const addr = (base_addr + self.x) & 0xFF;
-                self.bus.write(addr, self.a);
+                const addr = @addWithOverflow(base_addr, self.x);
+                self.bus.write(addr[0], self.a);
 
                 self.empty_cycles = 3;
             },
