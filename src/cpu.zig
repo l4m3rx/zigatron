@@ -262,6 +262,7 @@ pub const CPU = struct {
                 const offset = indirect_addr & 0x00FF;    // Low byte (offset within page)
 
                 // Read the target address with bug emulation
+                // TODO: Should we read from bus or cartage (offset) ?
                 const target_low = self.bus.read(indirect_addr);
                 const target_high = self.bus.read(page | ((offset + 1) & 0xFF));
                 // TODO: Wrap ?
