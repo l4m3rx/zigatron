@@ -58,7 +58,7 @@ pub const CPU = struct {
     pub fn readInstruction(self: *Self) void {
         self.opcode = self.bus.read(self.pc);
         self.pcIncrement(1);    // Increment PC
-        std.debug.print("C:{d:0>4} PC:0x{X:0>4} OP1:0x{X}\n", .{self.cycles, self.pc, self.opcode});
+        // std.debug.print("C:{d:0>4} PC:0x{X:0>4} OP1:0x{X}\n", .{self.cycles, self.pc, self.opcode});
     }
 
     pub fn interruptBit(self: *Self, b: bool) void {

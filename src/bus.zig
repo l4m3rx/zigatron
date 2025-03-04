@@ -51,17 +51,15 @@ pub const BUS = struct {
             return self.readCart(addr & 0x1FFF)
         else
             return 0; // bad place!
-
-
     }
 
     pub fn write(self: *BUS, addr: u16, data: u8) void {
-        if ((addr >= 0) and (addr <= 0x007F))
+        if ((addr >= 0) and (addr <= 0x00FF))
             self.ram.write(addr, data)
         else if ((addr >= 0xE000) and (addr <= 0x1FFF))
             self.bus[addr] = data
         else
-            std.debug.print("[warn]: Unexpected write address request [Address: 0x{X}]\n", .{addr});
+            std.debug.print("[warn]: Unhandled write request [Address: 0x{X}]\n", .{addr});
             return;
     }
 };
