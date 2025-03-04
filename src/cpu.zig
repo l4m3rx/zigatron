@@ -115,6 +115,22 @@ pub const CPU = struct {
             0xEA => {
                 self.empty_cycles = 1;
             },
+            0x06 => { // ASL Zero Page
+                const zp_addr_u8 = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const zp_addr: u16 = @intCast(zp_addr_u8);
+                const value = self.bus.read(zp_addr);
+                const carry_out = (value & 0x80) != 0;
+                const result = value << 1;
+                self.bus.write(zp_addr, result);
+
+                self.carryBit(carry_out);              // Carry flag = original bit 7
+                self.zeroBit(result == 0);             // Zero flag = true if result is 0
+                self.negativeBit((result & 0x80) != 0); // Negative flag = bit 7 of result
+
+                self.empty_cycles = 4;
+            },
             0x0A => { // ASL (Arithmetic Shift Left)
                 const carry = (self.a & 0x80) != 0;
                 self.a = self.a << 1;
