@@ -111,8 +111,9 @@ pub const CPU = struct {
                 self.readInstruction();
                 self.x = @intCast(self.opcode);
                 self.empty_cycles = 2;
+                // TODO: Set flags (N Z)
             },
-            0xCA => { // Decremetn X
+            0xCA => { // DEX (Decremetn X)
                 self.empty_cycles = 2;
                 if (self.x > 0)
                     self.x = self.x - 1
@@ -132,6 +133,7 @@ pub const CPU = struct {
                     self.x = self.x + 1
                 else
                     std.debug.print("[error] Cannot increment X register  [current:{}]\n", .{self.x});
+                // TODO: Flags
             },
             0x4C => { // JMP (Absolute Jump)
                 const op1: u16 = self.bus.read(self.pc);
