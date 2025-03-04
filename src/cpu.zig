@@ -76,7 +76,15 @@ pub const CPU = struct {
         // TODO: make this with enums
         switch(self.opcode) {
             0xEA => {
-                self.empty_cycles = 2;
+                self.empty_cycles = 1;
+            },
+            0x0A => { // ASL (Arithmetic Shift Left)
+                if ((self.a & 0b10000000) > 0) {
+                    self.status = self.status ^ 0b00000001;
+                    self.a = self.a ^ 0b10000000; // Drop highest bit TODO: double check this
+                }
+                self.a = self.a << 1;
+                self.empty_cycles = 1;
             },
             0x18 => { // CLC (Clear Carry)
                 self.status = self.status & 0b11111110;
@@ -91,7 +99,6 @@ pub const CPU = struct {
                 // self.bus.ram.write(self.opcode,  = @intCast(self.opcode);
             },
             0x85 => { // STA (Store Accumulator)
-                // self.cycleIncrement(1);
                 self.readInstruction();
                 self.a = @intCast(self.opcode);
                 self.empty_cycles = 3;
