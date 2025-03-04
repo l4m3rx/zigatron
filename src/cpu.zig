@@ -236,7 +236,7 @@ pub const CPU = struct {
             },
             0xCA => { // DEX (Decremetn X)
                 self.x -%= 1; // Wrapping subtraction
-                              //
+
                 self.zeroBit(self.x == 0);
                 self.negativeBit((self.x & 0x80) != 0);
 
@@ -257,7 +257,6 @@ pub const CPU = struct {
                 const high = self.bus.read(self.pc);
                 self.pcIncrement(1);
 
-                // self.pc = (high << 8) | low;
                 self.pc = (@as(u16, high) << 8) | low;
 
                 self.empty_cycles = 1;
