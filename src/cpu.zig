@@ -74,30 +74,26 @@ pub const CPU = struct {
         }
 
         self.readInstruction();
+        self.pcIncrement(1);
 
         // TODO: make this with enums
         switch(self.opcode) {
             0xEA => {
-                self.pcIncrement(1);
                 self.empty_cycles = 2;
             },
             0x18 => { // Clear Carry
-                self.pcIncrement(1);
                 self.status = self.status & 0b11111110;
             },
             0x38 => { // Set Carry
-                self.pcIncrement(1);
                 self.status = self.status ^ 0b00000001;
             },
             0x58 => { // Clear Interrupt Disable
-                self.pcIncrement(1);
                 self.status = self.status ^ 0b11011111;
             },
             0x84 => { // STY (Store Index Register Y In Memory)
                 // self.bus.ram.write(self.opcode,  = @intCast(self.opcode);
             },
             0x85 => { // STA (Store Accumulator)
-                self.pcIncrement(1);
                 self.cycleIncrement(1);
                 self.readInstruction();
                 self.a = @intCast(self.opcode);
@@ -105,19 +101,15 @@ pub const CPU = struct {
                 //  TODO: Status registers
             },
             0xB8 => { // Clear Overflow
-                self.pcIncrement(1);
                 self.status = self.status & 0b01000000;
             },
             0xD8 => { // Clear Decimal
-                self.pcIncrement(1);
                 self.status = self.status & 0b00001000;
             },
             0xF8 => { // Set Decimal
-                self.pcIncrement(1);
                 self.status = self.status ^ 0b00001000;
             },
             0xA6 => { // LDX (Load Index Register X from Memory)
-                self.pcIncrement(1);
                 self.cycleIncrement(1);
                 self.readInstruction();
                 self.x = @intCast(self.opcode);
@@ -125,7 +117,6 @@ pub const CPU = struct {
             },
             0xCA => { // Decremetn X
                 self.empty_cycles = 2;
-                self.pcIncrement(1);
                 if (self.x > 0)
                     self.x = self.x - 1
                 else
@@ -139,7 +130,6 @@ pub const CPU = struct {
                 //     self.status = self.status & 0b00000001; // Set Negative flag
             },
             0xE8 => { // Increment X
-                self.pcIncrement(1);
                 self.empty_cycles = 2;
                 if (self.x < 0xFF)
                     self.x = self.x + 1
@@ -147,7 +137,6 @@ pub const CPU = struct {
                     std.debug.print("[error] Cannot increment X register  [current:{}]\n", .{self.x});
             },
             0x4C => { // Absolute Jump (3 cycles)
-                self.pcIncrement(1);
                 self.cycleIncrement(1);
                 const op1: u16 = self.bus.read(self.pc);
 
@@ -165,11 +154,10 @@ pub const CPU = struct {
                 // the high byte is incorrectly fetched from $1200 instead of $1300. This quirk is present in the 6507 too.
             },
             0x0 => {
-                self.pcIncrement(1);
+                //self.pcIncrement(1);
             },
             else => {
-                std.debug.print("Unimplemented instruction 0x{X}\n", .{self.opcode});
-                self.pcIncrement(1);
+                std.debug.print("[warn] Unimplemented instruction 0x{X}\n", .{self.opcode});
             }
         }
 

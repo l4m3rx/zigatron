@@ -20,7 +20,7 @@ pub fn main() !void {
     var bus = try BUS.init(allocator, &ram, &cart);
     defer bus.deinit();
 
-    var cpu = try CPU.init(allocator, &ram, &bus);
+    var cpu = try CPU.init(allocator, &bus);
     defer cpu.deinit();
 
     ram.nuller();
