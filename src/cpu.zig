@@ -22,9 +22,8 @@ pub const CPU = struct {
 
     pub fn init(alloc: std.mem.Allocator, bus: *BUS) !Self {
         const stack = try alloc.alloc(u16, 16);
-        // const pc = @as(u16, &bus[0xFC]) | (@as(u16, &bus[0xFD]) << 8);
 
-        const c = CPU{
+        return CPU{
             .a = 0,
             .x = 0,
             .y = 0,
@@ -38,7 +37,6 @@ pub const CPU = struct {
             .stack = stack,
             .empty_cycles = 0
         };
-        return c;
     }
 
     pub fn deinit(self: *CPU) void {
