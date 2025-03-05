@@ -1614,8 +1614,126 @@ pub const CPU = struct {
 
                 self.empty_cycles = 3;
             },
+            0xB0 => { // BCS - Branch if Carry Set
+                const offset: i8 = @bitCast(self.bus.read(self.pc));
+                self.pcIncrement(1);
+
+                if ((self.status & 0x01) != 0) { // Carry flag set
+                    const wide: i32 = self.pc;
+                    self.pc = @intCast(wide + offset);
+
+                    if ((wide & 0xFF00) != (self.pc & 0xFF00)) {
+                        self.empty_cycles = 3;
+                    } else {
+                        self.empty_cycles = 2;
+                    }
+                } else {
+                    self.empty_cycles = 1;
+                }
+            },
+            0xB1 => { // LDA (Indirect,Y)
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const low = self.bus.read(zp_addr);
+                const high = self.bus.read((zp_addr +% 1) & 0xFF);
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.y);
+
+                self.a = self.bus.read(effective_addr);
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
+                    self.empty_cycles = 5
+                else
+                    self.empty_cycles = 4;
+            },
+            0xB4 => { // LDY Zero Page,X
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const effective_addr = (zp_addr +% self.x) & 0xFF;
+                self.y = self.bus.read(effective_addr);
+
+                self.zeroBit(self.y == 0);
+                self.negativeBit((self.y & 0x80) != 0);
+
+                self.empty_cycles = 3;
+            },
+            0xB5 => { // LDA Zero Page,X
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const effective_addr = (zp_addr +% self.x) & 0xFF;
+                self.a = self.bus.read(effective_addr);
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                self.empty_cycles = 3;
+            },
+            0xB6 => { // LDX Zero Page,Y
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const effective_addr = (zp_addr +% self.y) & 0xFF;
+                self.x = self.bus.read(effective_addr);
+
+                self.zeroBit(self.x == 0);
+                self.negativeBit((self.x & 0x80) != 0);
+
+                self.empty_cycles = 3;
+            },
             0xB8 => { // CLV (Clear Overflow)
                 self.overflowBit(false);
+            },
+            0xB9 => { // LDA Absolute,Y
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.y);
+
+                self.a = self.bus.read(effective_addr);
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
+                    self.empty_cycles = 4
+                else
+                    self.empty_cycles = 3;
+            },
+            0xBA => { // TSX - Transfer Stack Pointer to X
+                self.x = self.sp;
+
+                self.zeroBit(self.x == 0);
+                self.negativeBit((self.x & 0x80) != 0);
+
+                self.empty_cycles = 1; // 2 cycles total
+            },
+            0xBC => { // LDY Absolute,X
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.x);
+
+                self.y = self.bus.read(effective_addr);
+
+                self.zeroBit(self.y == 0);
+                self.negativeBit((self.y & 0x80) != 0);
+
+                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
+                    self.empty_cycles = 4
+                else
+                    self.empty_cycles = 3;
             },
             0xBD => { // LDA Absolute,X
                 const low = self.bus.read(self.pc);
@@ -1631,6 +1749,27 @@ pub const CPU = struct {
 
                 self.zeroBit(value == 0);
                 self.negativeBit((value & 0x80) != 0);
+
+                const temp = @as(u16, low) + @as(u16, self.x);
+                if (temp > 0xFF) {
+                    self.empty_cycles = 4;
+                } else {
+                    self.empty_cycles = 3;
+                }
+            },
+            0xBE => { // LDX Absolute,Y
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.y);
+
+                self.x = self.bus.read(effective_addr);
+
+                self.zeroBit(self.x == 0);
+                self.negativeBit((self.x & 0x80) != 0);
 
                 const temp = @as(u16, low) + @as(u16, self.x);
                 if (temp > 0xFF) {
