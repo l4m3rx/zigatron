@@ -71,7 +71,7 @@ pub const CPU = struct {
 
     pub fn crossSleep(self: *Self, base_addr: u16, effective_addr: u16, s: u8) void {
         if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
-            self.empty_cycles = s+2
+            self.empty_cycles = s+1
         else
             self.empty_cycles = s;
     }
@@ -149,7 +149,7 @@ pub const CPU = struct {
                 const pc_low: u8 = @intCast(self.pc & 0xFF);
                 self.bus.write(0x0100 + @as(u16, self.sp), pc_low);
                 self.sp -%= 1;
-                // Push status register with B flag set (bit 4)
+
                 const status_with_b = self.status | 0b00010000;
                 self.bus.write(0x0100 + @as(u16, self.sp), status_with_b);
                 self.sp -%= 1;
@@ -274,13 +274,7 @@ pub const CPU = struct {
                 if ((self.status & 0x80) == 0) {
                     const wide: i32 = self.pc;
                     self.pc = @intCast(wide + offset);
-
-                    // Check for page boundary crossing
-                    if ((wide & 0xFF00) != (self.pc & 0xFF00)) {
-                        self.empty_cycles = 3;
-                    } else {
-                        self.empty_cycles = 2;
-                    }
+                    self.crossSleep(@intCast(wide), self.pc, 2);
                 } else {
                     self.empty_cycles = 1;
                 }
@@ -300,10 +294,7 @@ pub const CPU = struct {
                 self.zeroBit(self.a == 0);
                 self.negativeBit((self.a & 0x80) != 0);
 
-                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
-                    self.empty_cycles = 5
-                else
-                    self.empty_cycles = 4;
+                self.crossSleep(base_addr, effective_addr, 4);
             },
             0x15 => { // ORA Zero Page,X
                 const zp_addr = self.bus.read(self.pc);
@@ -409,7 +400,6 @@ pub const CPU = struct {
 
                 self.bus.write(sp_addr, @intCast((return_addr >> 8) & 0xFF));
                 self.sp -%= 1;
-
                 self.bus.write(sp_addr, @intCast(return_addr & 0xFF));
                 self.sp -%= 1;
 
@@ -571,12 +561,7 @@ pub const CPU = struct {
                 if ((self.status & 0x80) != 0) { // Negative flag set
                     const wide: i32 = self.pc;
                     self.pc = @intCast(wide + offset);
-
-                    if ((wide & 0xFF00) != (self.pc & 0xFF00)) {
-                        self.empty_cycles = 3;
-                    } else {
-                        self.empty_cycles = 2;
-                    }
+                    self.crossSleep(@intCast(wide), self.pc, 2);
                 } else {
                     self.empty_cycles = 1;
                 }
@@ -596,10 +581,7 @@ pub const CPU = struct {
                 self.zeroBit(self.a == 0);
                 self.negativeBit((self.a & 0x80) != 0);
 
-                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
-                    self.empty_cycles = 5
-                else
-                    self.empty_cycles = 4;
+                self.crossSleep(base_addr, effective_addr, 4);
             },
             0x35 => { // AND Zero Page,X
                 const zp_addr = self.bus.read(self.pc);
@@ -632,10 +614,7 @@ pub const CPU = struct {
                 self.zeroBit(self.a == 0);
                 self.negativeBit((self.a & 0x80) != 0);
 
-                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
-                    self.empty_cycles = 4
-                else
-                    self.empty_cycles = 3;
+                self.crossSleep(base_addr, effective_addr, 3);
             },
             0x3D => { // AND Absolute,X
                 const low = self.bus.read(self.pc);
@@ -1142,13 +1121,7 @@ pub const CPU = struct {
                 if ((self.status & 0x40) != 0) { // Overflow flag (bit 6) set
                     const wide: i32 = self.pc;
                     self.pc +%= @intCast(wide + offset);
-
-                    // Check page boundary crossing
-                    if ((wide & 0xFF00) != (self.pc & 0xFF00)) {
-                        self.empty_cycles = 3;
-                    } else {
-                        self.empty_cycles = 2;
-                    }
+                    self.crossSleep(@intCast(wide), self.pc, 2);
                 } else {
                     self.empty_cycles = 1;
                 }
@@ -1179,10 +1152,7 @@ pub const CPU = struct {
                     self.status &= ~@as(u8, 0x40);
                 }
 
-                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
-                    self.empty_cycles = 5
-                else
-                    self.empty_cycles = 4;
+                self.crossSleep(base_addr, effective_addr, 4);
             },
             0x75 => { // ADC Zero Page,X
                 const zp_addr = self.bus.read(self.pc);
@@ -1400,12 +1370,7 @@ pub const CPU = struct {
                 if ((self.status & 0x01) == 0) { // Carry flag clear
                     const wide: i32 = self.pc;
                     self.pc +%= @intCast(wide + offset);
-
-                    if ((wide & 0xFF00) != (self.pc & 0xFF00)) {
-                        self.empty_cycles = 3;
-                    } else {
-                        self.empty_cycles = 2;
-                    }
+                    self.crossSleep(@intCast(wide), self.pc, 2);
                 } else {
                     self.empty_cycles = 1;
                 }
@@ -1632,12 +1597,7 @@ pub const CPU = struct {
                 if ((self.status & 0x01) != 0) { // Carry flag set
                     const wide: i32 = self.pc;
                     self.pc = @intCast(wide + offset);
-
-                    if ((wide & 0xFF00) != (self.pc & 0xFF00)) {
-                        self.empty_cycles = 3;
-                    } else {
-                        self.empty_cycles = 2;
-                    }
+                    self.crossSleep(@intCast(wide), self.pc, 2);
                 } else {
                     self.empty_cycles = 1;
                 }
@@ -1711,10 +1671,7 @@ pub const CPU = struct {
                 self.zeroBit(self.a == 0);
                 self.negativeBit((self.a & 0x80) != 0);
 
-                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
-                    self.empty_cycles = 4
-                else
-                    self.empty_cycles = 3;
+                self.crossSleep(base_addr, effective_addr, 3);
             },
             0xBA => { // TSX - Transfer Stack Pointer to X
                 self.x = self.sp;
@@ -1962,10 +1919,7 @@ pub const CPU = struct {
                 self.zeroBit(result == 0);
                 self.negativeBit((result & 0x80) != 0);
 
-                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
-                    self.empty_cycles = 5
-                else
-                    self.empty_cycles = 4;
+                self.crossSleep(base_addr, effective_addr, 4);
             },
             0xD5 => { // CMP Zero Page,X
                 const zp_addr = self.bus.read(self.pc);
@@ -2244,11 +2198,11 @@ pub const CPU = struct {
                     const wide: i32 = self.pc;
                     self.pc +%= @intCast(wide + offset);
 
-                    if ((wide & 0xFF00) != (self.pc & 0xFF00)) {
-                        self.empty_cycles = 3;
-                    } else {
+                    if ((wide & 0xFF00) != (self.pc & 0xFF00))
+                        self.empty_cycles = 3
+                    else
                         self.empty_cycles = 2;
-                    }
+                    // self.crossSleep(wide, self.pc, 2);
                 } else {
                     self.empty_cycles = 1;
                 }
