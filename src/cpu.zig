@@ -699,6 +699,37 @@ pub const CPU = struct {
 
                 self.empty_cycles = 6;
             },
+            0xFD => { // SBC Absolute,X
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.x);
+
+                const operand = self.bus.read(effective_addr);
+                const carry = (self.status & 0x01) != 0;
+                const a = self.a;
+                const borrow: u8 = if (carry) 0 else 1;
+                const result = a -% operand -% borrow;
+                self.a = result;
+
+                self.carryBit(a >= (operand +% borrow));
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                const overflow = ((a ^ result) & (a ^ operand) & 0x80) != 0;
+                if (overflow)
+                    self.status |= 0x40
+                else
+                    self.status &= ~@as(u8, 0x40);
+
+                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
+                    self.empty_cycles = 5
+                else
+                    self.empty_cycles = 4;
+            },
             else => {
                 std.debug.print("[warn] Unimplemented instruction 0x{X}\n", .{self.opcode});
             }
