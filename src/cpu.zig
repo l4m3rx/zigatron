@@ -1876,12 +1876,72 @@ pub const CPU = struct {
 
                 self.empty_cycles = 1;
             },
+            0xC9 => { // CMP Immediate
+                const value = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const result = self.a -% value;
+
+                self.carryBit(self.a >= value);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                self.empty_cycles = 1;
+            },
             0xCA => { // DEX (Decremetn X)
                 self.x -%= 1;
                 self.zeroBit(self.x == 0);
                 self.negativeBit((self.x & 0x80) != 0);
 
                 self.empty_cycles = 1;
+            },
+            0xCC => { // CPY Absolute
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const addr = (@as(u16, high) << 8) | low;
+                const value = self.bus.read(addr);
+                const result = self.y -% value;
+
+                self.carryBit(self.y >= value);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                self.empty_cycles = 3;
+            },
+            0xCD => { // CMP Absolute
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const addr = (@as(u16, high) << 8) | low;
+                const value = self.bus.read(addr);
+                const result = self.a -% value;
+
+                self.carryBit(self.a >= value);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                self.empty_cycles = 3;
+            },
+            0xCE => { // DEC Absolute
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const addr = (@as(u16, high) << 8) | low;
+                const value = self.bus.read(addr);
+                const result = value -% 1;
+
+                self.bus.write(addr, result);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                self.empty_cycles = 5;
             },
             0xD0 => { // BNE
                 // Read the signed 16-bit offset
