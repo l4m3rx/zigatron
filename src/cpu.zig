@@ -1963,6 +1963,55 @@ pub const CPU = struct {
                     self.empty_cycles = 1;
                 }
             },
+            0xD1 => { // CMP (Indirect,Y)
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const low = self.bus.read(zp_addr);
+                const high = self.bus.read((zp_addr +% 1) & 0xFF);
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.y);
+
+                const value = self.bus.read(effective_addr);
+                const result = self.a -% value;
+
+                self.carryBit(self.a >= value);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
+                    self.empty_cycles = 5
+                else
+                    self.empty_cycles = 4;
+            },
+            0xD5 => { // CMP Zero Page,X
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const effective_addr = (zp_addr +% self.x) & 0xFF;
+                const value = self.bus.read(effective_addr);
+                const result = self.a -% value;
+
+                self.carryBit(self.a >= value);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                self.empty_cycles = 3;
+            },
+            0xD6 => { // DEC Zero Page,X
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const effective_addr = (zp_addr +% self.x) & 0xFF;
+                const value = self.bus.read(effective_addr);
+                const result = value -% 1;
+
+                self.bus.write(effective_addr, result);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                self.empty_cycles = 5;
+            },
             0xD8 => { // CLD (Clear Decimal)
                 self.decimalBit(false);
             },
