@@ -698,6 +698,61 @@ pub const CPU = struct {
                 }
                 self.empty_cycles = 4;
             },
+            0x45 => { // EOR Zero Page
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const value = self.bus.read(zp_addr);
+                self.a ^= value;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                self.empty_cycles = 2;
+            },
+            0x46 => { // LSR Zero Page
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const value = self.bus.read(zp_addr);
+                const carry_out = (value & 0x01) != 0;
+                const result = value >> 1;
+
+                self.bus.write(zp_addr, result);
+                self.carryBit(carry_out);
+                self.zeroBit(result == 0);
+                self.negativeBit(false);
+
+                self.empty_cycles = 4;
+            },
+            0x48 => { // PHA - Push Accumulator
+                // TODO Check if we need to offset the addr
+                self.bus.write(0x0100 + @as(u16, self.sp), self.a);
+                self.sp -%= 1;
+
+                self.empty_cycles = 2;
+            },
+            0x49 => { // EOR Immediate
+                const value = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                self.a ^= value;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                self.empty_cycles = 1;
+            },
+            0x4A => { // LSR Accumulator
+                const carry_out = (self.a & 0x01) != 0;
+                self.a >>= 1;
+
+                self.carryBit(carry_out);
+                self.zeroBit(self.a == 0);
+                self.negativeBit(false);
+
+                self.empty_cycles = 1;
+            },
             0x4C => { // JMP (Absolute Jump)
                 const low = self.bus.read(self.pc);
                 self.pcIncrement(1);
