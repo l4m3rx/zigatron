@@ -681,6 +681,24 @@ pub const CPU = struct {
             0xF8 => { // SED (Set Decimal)
                 self.decimalBit(true);
             },
+            0xFE => { // INC Absolute,X
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.x);
+
+                const value = self.bus.read(effective_addr);
+                const new_value = value +% 1;
+                self.bus.write(effective_addr, new_value);
+
+                self.zeroBit(new_value == 0);
+                self.negativeBit((new_value & 0x80) != 0);
+
+                self.empty_cycles = 6;
+            },
             else => {
                 std.debug.print("[warn] Unimplemented instruction 0x{X}\n", .{self.opcode});
             }
