@@ -169,7 +169,6 @@ pub const CPU = struct {
         // TODO: make this with enums
         switch(self.opcode) {
             0x0 => {
-                // Skip the padding byte (PC += 1 beyond the opcode)
                 self.pcIncrement(1);
                 // Push PC high byte to stack
                 const pc_high: u8 = @intCast((self.pc >> 8) & 0xFF);
@@ -435,11 +434,8 @@ pub const CPU = struct {
                 self.empty_cycles = 3;
             },
             0x29 => { // AND Immediate
-                const value = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const value = self.getByte();
                 self.a &= value;
-
                 self.setZeroNegative(self.a);
                 self.empty_cycles = 1;
             },
@@ -696,11 +692,7 @@ pub const CPU = struct {
                 self.a ^= value;
 
                 self.setZeroNegative(self.a);
-
-                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
-                    self.empty_cycles = 5
-                else
-                    self.empty_cycles = 4;
+                self.crossSleep(base_addr, effective_addr, 4);
             },
             0x55 => { // EOR Zero Page,X
                 const zp_addr = self.getByte();
