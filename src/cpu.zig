@@ -908,6 +908,26 @@ pub const CPU = struct {
                 else
                     self.empty_cycles = 3;
             },
+            0x5E => { // LSR Absolute,X
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.x);
+
+                const value = self.bus.read(effective_addr);
+                const carry_out = (value & 0x01) != 0;
+                const result = value >> 1;
+
+                self.bus.write(effective_addr, result);
+                self.carryBit(carry_out);
+                self.zeroBit(result == 0);
+                self.negativeBit(false);
+
+                self.empty_cycles = 6;
+            },
             0x60 => { // RTS - Return from Subroutine
                 self.sp +%= 1;
                 const pc_low = self.bus.read(0x0100 + @as(u16, self.sp));
@@ -917,6 +937,117 @@ pub const CPU = struct {
                 self.pc = ((@as(u16, pc_high) << 8) | pc_low) +% 1;
 
                 self.empty_cycles = 5;
+            },
+            0x61 => { // ADC (Indirect,X)
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const effective_zp = (zp_addr +% self.x) & 0xFF;
+                const low = self.bus.read(effective_zp);
+                const high = self.bus.read((effective_zp +% 1) & 0xFF);
+                const effective_addr = (@as(u16, high) << 8) | low;
+
+                const operand = self.bus.read(effective_addr);
+                const carry = (self.status & 0x01) != 0;
+                const a = self.a;
+                const carry_val: u8 = if (carry) 1 else 0;
+                const result = a +% operand +% carry_val;
+                self.a = result;
+
+                self.carryBit(@as(u16, a) + @as(u16, operand) + @as(u16, carry_val) > 0xFF);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+                const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
+                if (overflow) {
+                    self.status |= 0x40;
+                } else {
+                    self.status &= ~@as(u8, 0x40);
+                }
+
+                self.empty_cycles = 5;
+            },
+            0x65 => { // ADC Zero Page
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const operand = self.bus.read(zp_addr);
+                const carry = (self.status & 0x01) != 0;
+                const a = self.a;
+                const carry_val: u8 = if (carry) 1 else 0;
+                const result = a +% operand +% carry_val;
+                self.a = result;
+
+                self.carryBit(@as(u16, a) + @as(u16, operand) + @as(u16, carry_val) > 0xFF);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+                const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
+                if (overflow) {
+                    self.status |= 0x40;
+                } else {
+                    self.status &= ~@as(u8, 0x40);
+                }
+
+                self.empty_cycles = 2;
+            },
+            0x66 => { // ROR Zero Page
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const value = self.bus.read(zp_addr);
+                const carry_in = (self.status & 0x01) != 0;
+                const carry_out = (value & 0x01) != 0;
+                const carry_bit: u8 = if (carry_in) 0x80 else 0;
+                const result = (value >> 1) | carry_bit;
+
+                self.bus.write(zp_addr, result);
+                self.carryBit(carry_out);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                self.empty_cycles = 4;
+            },
+            0x68 => { // PLA - Pull Accumulator
+                self.sp +%= 1;
+                self.a = self.bus.read(0x0100 + @as(u16, self.sp));
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                self.empty_cycles = 3;
+            },
+            0x69 => { // ADC Immediate
+                const operand = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const carry = (self.status & 0x01) != 0;
+                const a = self.a;
+                const carry_val: u8 = if (carry) 1 else 0; // Explicitly u8
+                const result = a +% operand +% carry_val;
+                self.a = result;
+
+                self.carryBit(@as(u16, a) + @as(u16, operand) + @as(u16, carry_val) > 0xFF);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+                const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
+                if (overflow) {
+                    self.status |= 0x40;
+                } else {
+                    self.status &= ~@as(u8, 0x40);
+                }
+
+                self.empty_cycles = 1;
+            },
+            0x6A => { // ROR Accumulator
+                const carry_in = (self.status & 0x01) != 0;
+                const carry_out = (self.a & 0x01) != 0;
+                const carry_bit: u8 = if (carry_in) 0x80 else 0;
+                self.a = (self.a >> 1) | carry_bit;
+
+                self.carryBit(carry_out);
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                self.empty_cycles = 1;
             },
             0x6C => { // Indirect Jump
                 // Indirect Mode (0x6C): Jumps to the address stored at the specified memory location.
