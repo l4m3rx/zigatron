@@ -91,6 +91,16 @@ pub const CPU = struct {
         return byte;
     }
 
+    pub fn pushStack(self: *Self, value: u8) void {
+        self.bus.write(0x0100 + @as(u16, self.sp), value);
+        self.sp -= 1;
+    }
+
+    pub fn pullStack(self: *Self) u8 {
+        self.sp += 1;
+        return self.bus.read(0x0100 + @as(u16, self.sp));
+    }
+
     pub fn setZeroNegative(self: *Self, value: u8) void {
         self.zeroBit(value == 0);
         self.negativeBit((value & 0x80) != 0);
@@ -101,16 +111,6 @@ pub const CPU = struct {
             self.status |= 0x40
         else
             self.status &= ~@as(u8, 0x40);
-    }
-
-    pub fn pushStack(self: *Self, value: u8) void {
-        self.bus.write(0x0100 + @as(u16, self.sp), value);
-        self.sp -= 1;
-    }
-
-    pub fn pullStack(self: *Self) u8 {
-        self.sp += 1;
-        return self.bus.read(0x0100 + @as(u16, self.sp));
     }
 
     pub fn interruptBit(self: *Self, b: bool) void {
@@ -180,7 +180,7 @@ pub const CPU = struct {
                 // Push PC high byte to stack
                 const pc_high: u8 = @intCast((self.pc >> 8) & 0xFF);
                 self.bus.write(0x0100 + @as(u16, self.sp), pc_high);
-                self.sp -%= 1; // Decrement SP with wrapping
+                self.sp -%= 1;
                 // Push PC low byte to stack
                 const pc_low: u8 = @intCast(self.pc & 0xFF);
                 self.bus.write(0x0100 + @as(u16, self.sp), pc_low);
@@ -222,8 +222,10 @@ pub const CPU = struct {
             0x06 => { // ASL Zero Page
                 const zp_addr_u8 = self.getByte();
                 const zp_addr: u16 = @intCast(zp_addr_u8);
+
                 const value = self.bus.read(zp_addr);
                 const carry_out = (value & 0x80) != 0;
+
                 const result = value << 1;
                 self.bus.write(zp_addr, result);
 
@@ -242,7 +244,6 @@ pub const CPU = struct {
                 self.pcIncrement(1);
 
                 self.a |= value;
-
                 self.setZeroNegative(self.a);
 
                 self.empty_cycles = 1;
@@ -261,7 +262,6 @@ pub const CPU = struct {
                 const value = self.bus.read(addr);
 
                 self.a |= value;
-
                 self.setZeroNegative(self.a);
 
                 self.empty_cycles = 3;
@@ -315,8 +315,10 @@ pub const CPU = struct {
             0x16 => { // ASL Zero Page,X
                 const zp_addr = self.getByte();
                 const effective_addr = (zp_addr +% self.x) & 0xFF;
+
                 const value = self.bus.read(effective_addr);
                 const carry_out = (value & 0x80) != 0;
+
                 const result = value << 1;
                 self.bus.write(effective_addr, result);
 
@@ -362,6 +364,7 @@ pub const CPU = struct {
 
                 const value = self.bus.read(effective_addr);
                 const carry_out = (value & 0x80) != 0;
+
                 const result = value << 1;
                 self.bus.write(effective_addr, result);
 
@@ -373,6 +376,7 @@ pub const CPU = struct {
             0x20 => { // JSR Absolute
                 const addr = self.getWord();
                 const return_addr = self.pc;
+
                 const temp_sp: u16 = self.sp;
                 const sp_addr: u16 = 0x100 + temp_sp;
 
@@ -401,6 +405,7 @@ pub const CPU = struct {
             0x24 => { // BIT Zero Page
                 const zp_addr = self.getByte();
                 const value = self.bus.read(zp_addr);
+
                 const result = self.a & value;
 
                 self.setZeroNegative(result);
@@ -422,9 +427,11 @@ pub const CPU = struct {
             0x26 => { // ROL Zero Page
                 const zp_addr = self.getByte();
                 const value = self.bus.read(zp_addr);
+
                 const carry_in = (self.status & 0x01) != 0;
                 const carry_out = (value & 0x80) != 0;
                 const carry_bit: u8 = if (carry_in) 1 else 0;
+
                 const result = (value << 1) | carry_bit;
 
                 self.bus.write(zp_addr, result);
@@ -460,6 +467,7 @@ pub const CPU = struct {
             0x2C => { // BIT Absolute
                 const addr = self.getWord();
                 const value = self.bus.read(addr);
+
                 const result = self.a & value;
 
                 self.setZeroNegative(result);
@@ -478,9 +486,11 @@ pub const CPU = struct {
             0x2E => { // ROL Absolute
                 const addr = self.getWord();
                 const value = self.bus.read(addr);
+
                 const carry_in = (self.status & 0x01) != 0;
                 const carry_out = (value & 0x80) != 0;
                 const carry_bit: u8 = if (carry_in) 1 else 0;
+
                 const result = (value << 1) | carry_bit;
 
                 self.bus.write(addr, result);
@@ -517,6 +527,7 @@ pub const CPU = struct {
             0x35 => { // AND Zero Page,X
                 const zp_addr = self.getByte();
                 const effective_addr = (zp_addr +% self.x) & 0xFF;
+
                 const value = self.bus.read(effective_addr);
                 self.a &= value;
 
@@ -551,9 +562,11 @@ pub const CPU = struct {
                 const effective_addr = base_addr +% @as(u16, self.x);
 
                 const value = self.bus.read(effective_addr);
+
                 const carry_in = (self.status & 0x01) != 0;
                 const carry_out = (value & 0x80) != 0;
                 const carry_bit: u8 = if (carry_in) 1 else 0;
+
                 const result = (value << 1) | carry_bit;
 
                 self.bus.write(effective_addr, result);
@@ -593,8 +606,8 @@ pub const CPU = struct {
 
                 const data = self.bus.readRam(self.opcode);
                 self.bus.write(self.opcode, data-1);
-                // TODO Verify this
-                self.setZeroNegative(data-1);
+                self.setZeroNegative(data-1); // TODO: Verify this
+
                 self.empty_cycles = 4;
             },
             0x45 => { // EOR Zero Page
@@ -810,11 +823,12 @@ pub const CPU = struct {
             0x66 => { // ROR Zero Page
                 const zp_addr = self.getByte();
                 const value = self.bus.read(zp_addr);
+
                 const carry_in = (self.status & 0x01) != 0;
                 const carry_out = (value & 0x01) != 0;
                 const carry_bit: u8 = if (carry_in) 0x80 else 0;
-                const result = (value >> 1) | carry_bit;
 
+                const result = (value >> 1) | carry_bit;
                 self.bus.write(zp_addr, result);
 
                 self.carryBit(carry_out);
