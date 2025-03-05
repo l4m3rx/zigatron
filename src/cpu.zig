@@ -593,6 +593,68 @@ pub const CPU = struct {
             0x38 => { // SEC (Set Carry)
                 self.carryBit(true);
             },
+            0x39 => { // AND Absolute,Y
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.y);
+
+                const value = self.bus.read(effective_addr);
+                self.a &= value;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
+                    self.empty_cycles = 4
+                else
+                    self.empty_cycles = 3;
+            },
+            0x3D => { // AND Absolute,X
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.x);
+
+                const value = self.bus.read(effective_addr);
+                self.a &= value;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
+                    self.empty_cycles = 4
+                else
+                    self.empty_cycles = 3;
+            },
+            0x3E => { // ROL Absolute,X
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.x);
+
+                const value = self.bus.read(effective_addr);
+                const carry_in = (self.status & 0x01) != 0;
+                const carry_out = (value & 0x80) != 0;
+                const carry_bit: u8 = if (carry_in) 1 else 0;
+                const result = (value << 1) | carry_bit;
+
+                self.bus.write(effective_addr, result);
+                self.carryBit(carry_out);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                self.empty_cycles = 6;
+            },
             0x40 => { // RTI - Return from Interrupt
                 self.sp +%= 1;
                 self.status = self.bus.read(0x0100 + @as(u16, self.sp));
@@ -603,6 +665,23 @@ pub const CPU = struct {
                 const pc_high = self.bus.read(0x0100 + @as(u16, self.sp));
 
                 self.pc = (@as(u16, pc_high) << 8) | pc_low;
+
+                self.empty_cycles = 5;
+            },
+            0x41 => { // EOR (Indirect,X)
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const effective_zp = (zp_addr +% self.x) & 0xFF;
+                const low = self.bus.read(effective_zp);
+                const high = self.bus.read((effective_zp +% 1) & 0xFF);
+                const effective_addr = (@as(u16, high) << 8) | low;
+
+                const value = self.bus.read(effective_addr);
+                self.a ^= value;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
 
                 self.empty_cycles = 5;
             },
