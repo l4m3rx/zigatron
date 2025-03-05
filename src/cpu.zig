@@ -462,6 +462,54 @@ pub const CPU = struct {
 
                 self.empty_cycles = 4;
             },
+            0x28 => { // PLP - Pull Processor Status
+                self.sp +%= 1;
+                self.status = self.bus.read(0x0100 + @as(u16, self.sp));
+
+                self.empty_cycles = 3;
+            },
+            0x29 => { // AND Immediate
+                const value = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                self.a &= value;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                self.empty_cycles = 1;
+            },
+            0x2A => { // ROL Accumulator
+                const carry_in = (self.status & 0x01) != 0;
+                const carry_out = (self.a & 0x80) != 0;
+                const carry_bit: u8 = if (carry_in) 1 else 0;
+                self.a = (self.a << 1) | carry_bit;
+
+                self.carryBit(carry_out);
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                self.empty_cycles = 1;
+            },
+            0x2C => { // BIT Absolute
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const addr = (@as(u16, high) << 8) | low;
+                const value = self.bus.read(addr);
+                const result = self.a & value;
+
+                self.zeroBit(result == 0);
+                self.negativeBit((value & 0x80) != 0);
+                if (value & 0x40 != 0)
+                    self.status |= 0x40
+                else
+                    self.status &= ~@as(u8, 0x40);
+
+                self.empty_cycles = 3;
+            },
             0x31 => { // EOR (Indirect,Y)
                 const zp_addr = self.bus.read(self.pc);
                 self.pcIncrement(1);
