@@ -237,6 +237,18 @@ pub const CPU = struct {
                 }
                 self.empty_cycles = 4;
             },
+            0x4C => { // JMP (Absolute Jump)
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                self.pc = (@as(u16, high) << 8) | low;
+
+                self.empty_cycles = 1;
+                std.debug.print("Jumping to address 0x{X}\n", .{self.pc});
+            },
             0x50 => { // BVC - Branch if Overflow Clear
                 const offset: i8 = @bitCast(self.bus.read(self.pc)); // Signed offset
                 self.pcIncrement(1);
@@ -270,6 +282,33 @@ pub const CPU = struct {
                 self.pc = ((@as(u16, pc_high) << 8) | pc_low) +% 1;
 
                 self.empty_cycles = 5;
+            },
+            0x6C => { // Indirect Jump
+                // Indirect Mode (0x6C): Jumps to the address stored at the specified memory location.
+                // Useful for dynamic jumps (e.g., jump tables), but it has a known bug on the original 6502: if the low byte is at $xxFF (e.g., $12FF),
+                // the high byte is incorrectly fetched from $1200 instead of $1300. This quirk is present in the 6507 too.
+                //
+                // Read the 16-bit indirect address from PC+1 and PC+2
+                const addr_low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const addr_high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const indirect_addr = (@as(u16, addr_high) << 8) | addr_low;
+
+                // Emulate the bug by splitting into page and offset
+                const page = indirect_addr & 0xFF00;      // High byte of the page
+                const offset = indirect_addr & 0x00FF;    // Low byte (offset within page)
+
+                // Read the target address with bug emulation
+                // TODO: Should we read from bus or cartage (offset) ?
+                const target_low = self.bus.read(indirect_addr);
+                const target_high = self.bus.read(page | ((offset + 1) & 0xFF));
+                // TODO: Wrap ?
+                // If offset = 0xFF, (offset + 1) & 0xFF = 0x00, so it reads from page start
+
+                self.pc = (@as(u16, target_high) << 8) | target_low;
+
+                self.empty_cycles = 4;
             },
             0x70 => { // BVS - Branch if Overflow Set
                 const offset: i8 = @bitCast(self.bus.read(self.pc));
@@ -313,6 +352,26 @@ pub const CPU = struct {
 
                 self.empty_cycles = 2;
             },
+            0x90 => { // BCC - Branch if Carry Clear
+                const offset: i8 = @bitCast(self.bus.read(self.pc));
+                self.pcIncrement(1);
+
+                if ((self.status & 0x01) == 0) { // Carry flag clear
+                    const wide: i32 = self.pc;
+
+                    // TODO: handle wrapping
+                    self.pc = @intCast(wide + offset);
+                    // self.pc = self.pc +% @bitCast(u16, @as(i16, offset));
+
+                    if ((wide & 0xFF00) != (self.pc & 0xFF00)) {
+                        self.empty_cycles = 3;
+                    } else {
+                        self.empty_cycles = 2;
+                    }
+                } else {
+                    self.empty_cycles = 1;
+                }
+            },
             0x94 => { // STY Zero Page, X
                 const zp_addr = self.bus.read(self.pc);
                 self.pcIncrement(1);
@@ -335,15 +394,6 @@ pub const CPU = struct {
                 self.sp = self.x;
 
                 self.empty_cycles = 1;
-            },
-            0xB8 => { // CLV (Clear Overflow)
-                self.overflowBit(false);
-            },
-            0xD8 => { // CLD (Clear Decimal)
-                self.decimalBit(false);
-            },
-            0xF8 => { // SED (Set Decimal)
-                self.decimalBit(true);
             },
             0xA0 => { // LDY Immediate
                 const value = self.bus.read(self.pc);
@@ -386,74 +436,6 @@ pub const CPU = struct {
 
                 self.empty_cycles = 2;
             },
-            0xC6 => { // DEC Zero Page (replacing 0x44)
-                const addr = self.bus.read(self.pc); // Zero-page address
-                self.pcIncrement(1);
-
-                const value = self.bus.read(addr);
-                const result = value - 1;
-                self.bus.write(addr, result);
-
-                self.zeroBit(result == 0);
-                self.negativeBit((result & 0x80) != 0);
-
-                self.empty_cycles = 4;
-            },
-            0xCA => { // DEX (Decremetn X)
-                self.x -%= 1; // Wrapping subtraction
-
-                self.zeroBit(self.x == 0);
-                self.negativeBit((self.x & 0x80) != 0);
-
-                self.empty_cycles = 1;
-            },
-            0xE8 => { // INX (Increment X)
-                self.x +%= 1;
-
-                self.zeroBit(self.x == 0);
-                self.negativeBit((self.x & 0x80) != 0);
-
-                self.empty_cycles = 1;
-            },
-            0x4C => { // JMP (Absolute Jump)
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                self.pc = (@as(u16, high) << 8) | low;
-
-                self.empty_cycles = 1;
-                std.debug.print("Jumping to address 0x{X}\n", .{self.pc});
-            },
-            0x6C => { // Indirect Jump
-                // Indirect Mode (0x6C): Jumps to the address stored at the specified memory location.
-                // Useful for dynamic jumps (e.g., jump tables), but it has a known bug on the original 6502: if the low byte is at $xxFF (e.g., $12FF),
-                // the high byte is incorrectly fetched from $1200 instead of $1300. This quirk is present in the 6507 too.
-                //
-                // Read the 16-bit indirect address from PC+1 and PC+2
-                const addr_low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const addr_high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const indirect_addr = (@as(u16, addr_high) << 8) | addr_low;
-
-                // Emulate the bug by splitting into page and offset
-                const page = indirect_addr & 0xFF00;      // High byte of the page
-                const offset = indirect_addr & 0x00FF;    // Low byte (offset within page)
-
-                // Read the target address with bug emulation
-                // TODO: Should we read from bus or cartage (offset) ?
-                const target_low = self.bus.read(indirect_addr);
-                const target_high = self.bus.read(page | ((offset + 1) & 0xFF));
-                // TODO: Wrap ?
-                // If offset = 0xFF, (offset + 1) & 0xFF = 0x00, so it reads from page start
-
-                self.pc = (@as(u16, target_high) << 8) | target_low;
-
-                self.empty_cycles = 4;
-            },
             0xAC => { // LDY Absolute
                 const low = self.bus.read(self.pc);
                 self.pcIncrement(1);
@@ -484,6 +466,9 @@ pub const CPU = struct {
 
                 self.empty_cycles = 3;
             },
+            0xB8 => { // CLV (Clear Overflow)
+                self.overflowBit(false);
+            },
             0xBD => { // LDA Absolute,X
                 const low = self.bus.read(self.pc);
                 self.pcIncrement(1);
@@ -506,6 +491,39 @@ pub const CPU = struct {
                     self.empty_cycles = 3;
                 }
             },
+            0xC0 => { // CPY - Compare Y Immediate
+                const operand = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const result = self.y -% operand; // Wrapping subtraction
+
+                self.carryBit(self.y >= operand);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                self.empty_cycles = 1;
+            },
+            0xC6 => { // DEC Zero Page (replacing 0x44)
+                const addr = self.bus.read(self.pc); // Zero-page address
+                self.pcIncrement(1);
+
+                const value = self.bus.read(addr);
+                const result = value - 1;
+                self.bus.write(addr, result);
+
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                self.empty_cycles = 4;
+            },
+            0xCA => { // DEX (Decremetn X)
+                self.x -%= 1; // Wrapping subtraction
+
+                self.zeroBit(self.x == 0);
+                self.negativeBit((self.x & 0x80) != 0);
+
+                self.empty_cycles = 1;
+            },
             0xD0 => { // BNE
                 // Read the signed 16-bit offset
                 const offset: i16 = @intCast(self.bus.read(self.pc));
@@ -526,6 +544,17 @@ pub const CPU = struct {
                 } else {
                     self.empty_cycles = 1;
                 }
+            },
+            0xD8 => { // CLD (Clear Decimal)
+                self.decimalBit(false);
+            },
+            0xE8 => { // INX (Increment X)
+                self.x +%= 1;
+
+                self.zeroBit(self.x == 0);
+                self.negativeBit((self.x & 0x80) != 0);
+
+                self.empty_cycles = 1;
             },
             0xE9 => { // SBC Immediate
                 const operand = self.bus.read(self.pc);
@@ -556,6 +585,24 @@ pub const CPU = struct {
             0xEA => {
                 self.empty_cycles = 1;
             },
+            0xF0 => { // BEQ - Branch if Equal
+                const offset: i8 = @bitCast(self.bus.read(self.pc));
+                self.pcIncrement(1);
+
+                if ((self.status & 0x02) != 0) { // Zero flag set
+                    const wide: i32 = self.pc;
+                    // TODO : Fix wrapping
+                    self.pc = @intCast(wide + offset);
+
+                    if ((wide & 0xFF00) != (self.pc & 0xFF00)) {
+                        self.empty_cycles = 3;
+                    } else {
+                        self.empty_cycles = 2;
+                    }
+                } else {
+                    self.empty_cycles = 1;
+                }
+            },
             0xF6 => { // INC Zero Page, X
                 const zp_addr = self.bus.read(self.pc);
                 self.pcIncrement(1);
@@ -570,6 +617,9 @@ pub const CPU = struct {
                 self.negativeBit((new_value & 0x80) != 0);
 
                 self.empty_cycles = 5;
+            },
+            0xF8 => { // SED (Set Decimal)
+                self.decimalBit(true);
             },
             else => {
                 std.debug.print("[warn] Unimplemented instruction 0x{X}\n", .{self.opcode});
