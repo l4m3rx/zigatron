@@ -1948,7 +1948,7 @@ pub const CPU = struct {
 
                 self.empty_cycles = 1;
             },
-            0xEA => {
+            0xEA => { // NOP
                 self.empty_cycles = 1;
             },
             0xEE => { // INC Absolute
