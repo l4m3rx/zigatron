@@ -1487,6 +1487,22 @@ pub const CPU = struct {
 
                 self.empty_cycles = 1;
             },
+            0xA1 => { // LDA (Indirect,X)
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const effective_zp = (zp_addr +% self.x) & 0xFF;
+                const low = self.bus.read(effective_zp);
+                const high = self.bus.read((effective_zp +% 1) & 0xFF);
+                const effective_addr = (@as(u16, high) << 8) | low;
+
+                self.a = self.bus.read(effective_addr);
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                self.empty_cycles = 5;
+            },
             0xA2 => { // LDX (Load X register Immidate)
                 self.readInstruction();
                 self.x = @intCast(self.opcode);
@@ -1495,6 +1511,17 @@ pub const CPU = struct {
                 self.negativeBit((self.x & 0x80) != 0);
 
                 self.empty_cycles = 1;
+            },
+            0xA4 => { // LDY Zero Page
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                self.y = self.bus.read(zp_addr);
+
+                self.zeroBit(self.y == 0);
+                self.negativeBit((self.y & 0x80) != 0);
+
+                self.empty_cycles = 2;
             },
             0xA5 => { // LDA (Load Accumulator ZeroPage)
                 const addr = self.bus.read(self.pc);
@@ -1517,6 +1544,31 @@ pub const CPU = struct {
                 self.negativeBit((self.x & 0x80) != 0);
 
                 self.empty_cycles = 2;
+            },
+            0xA8 => { // TAY - Transfer Accumulator to Y
+                self.y = self.a;
+
+                self.zeroBit(self.y == 0);
+                self.negativeBit((self.y & 0x80) != 0);
+
+                self.empty_cycles = 1;
+            },
+            0xA9 => { // LDA Immediate
+                self.a = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                self.empty_cycles = 1;
+            },
+            0xAA => { // TAX - Transfer Accumulator to X
+                self.x = self.a;
+
+                self.zeroBit(self.x == 0);
+                self.negativeBit((self.x & 0x80) != 0);
+
+                self.empty_cycles = 1;
             },
             0xAC => { // LDY Absolute
                 const low = self.bus.read(self.pc);
@@ -1545,6 +1597,20 @@ pub const CPU = struct {
 
                 self.zeroBit(value == 0);
                 self.negativeBit((value & 0x80) != 0);
+
+                self.empty_cycles = 3;
+            },
+            0xAE => { // LDX Absolute
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const addr = (@as(u16, high) << 8) | low;
+                self.x = self.bus.read(addr);
+
+                self.zeroBit(self.x == 0);
+                self.negativeBit((self.x & 0x80) != 0);
 
                 self.empty_cycles = 3;
             },
