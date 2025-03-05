@@ -765,6 +765,39 @@ pub const CPU = struct {
                 self.empty_cycles = 1;
                 std.debug.print("Jumping to address 0x{X}\n", .{self.pc});
             },
+            0x4D => { // EOR Absolute
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const addr = (@as(u16, high) << 8) | low;
+                const value = self.bus.read(addr);
+                self.a ^= value;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                self.empty_cycles = 3;
+            },
+            0x4E => { // LSR Absolute
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const addr = (@as(u16, high) << 8) | low;
+                const value = self.bus.read(addr);
+                const carry_out = (value & 0x01) != 0;
+                const result = value >> 1;
+
+                self.bus.write(addr, result);
+                self.carryBit(carry_out);
+                self.zeroBit(result == 0);
+                self.negativeBit(false);
+
+                self.empty_cycles = 5;
+            },
             0x50 => { // BVC - Branch if Overflow Clear
                 const offset: i8 = @bitCast(self.bus.read(self.pc)); // Signed offset
                 self.pcIncrement(1);
@@ -783,8 +816,97 @@ pub const CPU = struct {
                     self.empty_cycles = 1;
                 }
             },
+            0x51 => { // EOR (Indirect,Y)
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const low = self.bus.read(zp_addr);
+                const high = self.bus.read((zp_addr +% 1) & 0xFF);
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.y);
+
+                const value = self.bus.read(effective_addr);
+                self.a ^= value;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
+                    self.empty_cycles = 5
+                else
+                    self.empty_cycles = 4;
+            },
+            0x55 => { // EOR Zero Page,X
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const effective_addr = (zp_addr +% self.x) & 0xFF;
+                const value = self.bus.read(effective_addr);
+                self.a ^= value;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                self.empty_cycles = 3;
+            },
+            0x56 => { // LSR Zero Page,X
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const effective_addr = (zp_addr +% self.x) & 0xFF;
+                const value = self.bus.read(effective_addr);
+                const carry_out = (value & 0x01) != 0;
+                const result = value >> 1;
+
+                self.bus.write(effective_addr, result);
+                self.carryBit(carry_out);
+                self.zeroBit(result == 0);
+                self.negativeBit(false);
+
+                self.empty_cycles = 5;
+            },
             0x58 => { // CLI (Clear Interrupt Disable)
                 self.interruptBit(false);
+            },
+            0x59 => { // EOR Absolute,Y
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.y);
+
+                const value = self.bus.read(effective_addr);
+                self.a ^= value;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
+                    self.empty_cycles = 4
+                else
+                    self.empty_cycles = 3;
+            },
+            0x5D => { // EOR Absolute,X
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.x);
+
+                const value = self.bus.read(effective_addr);
+                self.a ^= value;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
+                    self.empty_cycles = 4
+                else
+                    self.empty_cycles = 3;
             },
             0x60 => { // RTS - Return from Subroutine
                 self.sp +%= 1;
