@@ -356,26 +356,6 @@ pub const CPU = struct {
                 else
                     self.empty_cycles = 3;
             },
-            0x20 => { // JSR Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const return_addr = self.pc;
-                const temp_sp: u16 = self.sp;
-                const sp_addr: u16 = 0x100 + temp_sp;
-
-                self.bus.write(sp_addr, @intCast((return_addr >> 8) & 0xFF));
-                self.sp -%= 1;
-
-                self.bus.write(sp_addr, @intCast(return_addr & 0xFF));
-                self.sp -%= 1;
-
-                self.pc = (@as(u16, high) << 8) | low;
-
-                self.empty_cycles = 5;
-            },
             0x1E => { // ASL Absolute,X
                 const low = self.bus.read(self.pc);
                 self.pcIncrement(1);
@@ -396,6 +376,26 @@ pub const CPU = struct {
 
                 self.empty_cycles = 6;
             },
+            0x20 => { // JSR Absolute
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const return_addr = self.pc;
+                const temp_sp: u16 = self.sp;
+                const sp_addr: u16 = 0x100 + temp_sp;
+
+                self.bus.write(sp_addr, @intCast((return_addr >> 8) & 0xFF));
+                self.sp -%= 1;
+
+                self.bus.write(sp_addr, @intCast(return_addr & 0xFF));
+                self.sp -%= 1;
+
+                self.pc = (@as(u16, high) << 8) | low;
+
+                self.empty_cycles = 5;
+            },
             0x21 => { // AND (Indirect,Y)
                 const zp_addr = self.bus.read(self.pc);
                 self.pcIncrement(1);
@@ -415,6 +415,52 @@ pub const CPU = struct {
                     self.empty_cycles = 5
                 else
                     self.empty_cycles = 4;
+            },
+            0x24 => { // BIT Zero Page
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const value = self.bus.read(zp_addr);
+                const result = self.a & value;
+
+                self.zeroBit(result == 0);
+                self.negativeBit((value & 0x80) != 0);
+                if (value & 0x40 != 0)
+                    self.status |= 0x40
+                else
+                    self.status &= ~@as(u8, 0x40);
+
+                self.empty_cycles = 2;
+            },
+            0x25 => { // AND Zero Page
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const value = self.bus.read(zp_addr);
+                self.a &= value;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                self.empty_cycles = 2;
+            },
+            0x26 => { // ROL Zero Page
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const value = self.bus.read(zp_addr);
+                const carry_in = (self.status & 0x01) != 0;
+                const carry_out = (value & 0x80) != 0;
+                const carry_bit: u8 = if (carry_in) 1 else 0; // Explicitly u8
+                const result = (value << 1) | carry_bit;
+
+                self.bus.write(zp_addr, result);
+
+                self.carryBit(carry_out);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                self.empty_cycles = 4;
             },
             0x31 => { // EOR (Indirect,Y)
                 const zp_addr = self.bus.read(self.pc);
