@@ -505,6 +505,58 @@ pub const CPU = struct {
 
                 self.empty_cycles = 3;
             },
+            0x2D => { // AND Absolute
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const addr = (@as(u16, high) << 8) | low;
+                const value = self.bus.read(addr);
+                self.a &= value;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                self.empty_cycles = 3;
+            },
+            0x2E => { // ROL Absolute
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const addr = (@as(u16, high) << 8) | low;
+                const value = self.bus.read(addr);
+                const carry_in = (self.status & 0x01) != 0;
+                const carry_out = (value & 0x80) != 0;
+                const carry_bit: u8 = if (carry_in) 1 else 0;
+                const result = (value << 1) | carry_bit;
+
+                self.bus.write(addr, result);
+                self.carryBit(carry_out);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                self.empty_cycles = 5;
+            },
+            0x30 => { // BMI - Branch if Minus
+                const offset: i8 = @bitCast(self.bus.read(self.pc));
+                self.pcIncrement(1);
+
+                if ((self.status & 0x80) != 0) { // Negative flag set
+                    const wide: i32 = self.pc;
+                    self.pc = @intCast(wide + offset);
+
+                    if ((wide & 0xFF00) != (self.pc & 0xFF00)) {
+                        self.empty_cycles = 3;
+                    } else {
+                        self.empty_cycles = 2;
+                    }
+                } else {
+                    self.empty_cycles = 1;
+                }
+            },
             0x31 => { // EOR (Indirect,Y)
                 const zp_addr = self.bus.read(self.pc);
                 self.pcIncrement(1);
@@ -524,6 +576,19 @@ pub const CPU = struct {
                     self.empty_cycles = 5
                 else
                     self.empty_cycles = 4;
+            },
+            0x35 => { // AND Zero Page,X
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const effective_addr = (zp_addr +% self.x) & 0xFF;
+                const value = self.bus.read(effective_addr);
+                self.a &= value;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                self.empty_cycles = 3;
             },
             0x38 => { // SEC (Set Carry)
                 self.carryBit(true);
