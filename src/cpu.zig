@@ -820,11 +820,7 @@ pub const CPU = struct {
                 self.negativeBit((result & 0x80) != 0);
 
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
-                if (overflow) {
-                    self.status |= 0x40;
-                } else {
-                    self.status &= ~@as(u8, 0x40);
-                }
+                self.setOverflowFlag(overflow);
 
                 self.empty_cycles = 5;
             },
@@ -844,11 +840,7 @@ pub const CPU = struct {
                 self.negativeBit((result & 0x80) != 0);
 
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
-                if (overflow) {
-                    self.status |= 0x40;
-                } else {
-                    self.status &= ~@as(u8, 0x40);
-                }
+                self.setOverflowFlag(overflow);
 
                 self.empty_cycles = 2;
             },
@@ -893,11 +885,7 @@ pub const CPU = struct {
                 self.negativeBit((result & 0x80) != 0);
 
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
-                if (overflow) {
-                    self.status |= 0x40;
-                } else {
-                    self.status &= ~@as(u8, 0x40);
-                }
+                self.setOverflowFlag(overflow);
 
                 self.empty_cycles = 1;
             },
@@ -946,10 +934,7 @@ pub const CPU = struct {
                 self.negativeBit((result & 0x80) != 0);
 
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
-                if (overflow)
-                    self.status |= 0x40
-                else
-                    self.status &= ~@as(u8, 0x40);
+                self.setOverflowFlag(overflow);
 
                 self.empty_cycles = 3;
             },
@@ -1000,11 +985,7 @@ pub const CPU = struct {
                 self.zeroBit(result == 0);
                 self.negativeBit((result & 0x80) != 0);
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
-                if (overflow) {
-                    self.status |= 0x40;
-                } else {
-                    self.status &= ~@as(u8, 0x40);
-                }
+                self.setOverflowFlag(overflow);
 
                 self.crossSleep(base_addr, effective_addr, 4);
             },
@@ -1024,10 +1005,7 @@ pub const CPU = struct {
                 self.zeroBit(result == 0);
                 self.negativeBit((result & 0x80) != 0);
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
-                if (overflow)
-                    self.status |= 0x40
-                else
-                    self.status &= ~@as(u8, 0x40);
+                self.setOverflowFlag(overflow);
 
                 self.empty_cycles = 3;
             },
@@ -1068,11 +1046,7 @@ pub const CPU = struct {
                 self.zeroBit(result == 0);
                 self.negativeBit((result & 0x80) != 0);
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
-                if (overflow) {
-                    self.status |= 0x40;
-                } else {
-                    self.status &= ~@as(u8, 0x40);
-                }
+                self.setOverflowFlag(overflow);
 
                 self.crossSleep(base_addr, effective_addr, 3);
             },
@@ -1091,11 +1065,7 @@ pub const CPU = struct {
                 self.zeroBit(result == 0);
                 self.negativeBit((result & 0x80) != 0);
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
-                if (overflow) {
-                    self.status |= 0x40;
-                } else {
-                    self.status &= ~@as(u8, 0x40);
-                }
+                self.setOverflowFlag(overflow);
 
                 self.crossSleep(base_addr, effective_addr, 3);
             },
@@ -1795,10 +1765,7 @@ pub const CPU = struct {
                 self.negativeBit((result & 0x80) != 0);
 
                 const overflow = ((a ^ result) & (a ^ operand) & 0x80) != 0;
-                if (overflow)
-                    self.status |= 0x40
-                else
-                    self.status &= ~@as(u8, 0x40);
+                self.setOverflowFlag(overflow);
 
                 self.crossSleep(base_addr, effective_addr, 4);
             },
@@ -1831,11 +1798,7 @@ pub const CPU = struct {
                 self.negativeBit((result & 0x80) != 0);
 
                 const overflow = ((a ^ result) & (a ^ operand) & 0x80) != 0;
-                if (overflow) {
-                    self.status |= 0x40;
-                } else {
-                    self.status &= ~@as(u8, 0x40);
-                }
+                self.setOverflowFlag(overflow);
 
                 self.empty_cycles = 2;
             },
@@ -1877,11 +1840,7 @@ pub const CPU = struct {
 
                 // Overflow: (A positive, operand negative) or (A negative, operand positive) crossing zero
                 const overflow = ((a ^ result) & (a ^ operand) & 0x80) != 0;
-                if (overflow) {
-                    self.status |= 0x40; // Set overflow flag (bit 6)
-                } else {
-                    self.status &= ~@as(u8, 0x40); // Clear overflow flag
-                }
+                self.setOverflowFlag(overflow);
 
                 self.empty_cycles = 1;
             },
@@ -1913,10 +1872,7 @@ pub const CPU = struct {
                 self.negativeBit((result & 0x80) != 0);
 
                 const overflow = ((a ^ result) & (a ^ operand) & 0x80) != 0;
-                if (overflow)
-                    self.status |= 0x40
-                else
-                    self.status &= ~@as(u8, 0x40);
+                self.setOverflowFlag(overflow);
 
                 self.empty_cycles = 3;
             },
@@ -1969,10 +1925,7 @@ pub const CPU = struct {
                 self.negativeBit((result & 0x80) != 0);
 
                 const overflow = ((a ^ result) & (a ^ operand) & 0x80) != 0;
-                if (overflow)
-                    self.status |= 0x40
-                else
-                    self.status &= ~@as(u8, 0x40);
+                self.setOverflowFlag(overflow);
 
                 self.crossSleep(base_addr, effective_addr, 4);
             },
@@ -1993,10 +1946,7 @@ pub const CPU = struct {
                 self.negativeBit((result & 0x80) != 0);
 
                 const overflow = ((a ^ result) & (a ^ operand) & 0x80) != 0;
-                if (overflow)
-                    self.status |= 0x40
-                else
-                    self.status &= ~@as(u8, 0x40);
+                self.setOverflowFlag(overflow);
 
                 self.empty_cycles = 3;
             },
@@ -2034,10 +1984,7 @@ pub const CPU = struct {
                 self.zeroBit(result == 0);                     // Zero: result is 0
                 self.negativeBit((result & 0x80) != 0);        // Negative: bit 7 set
                 const overflow = ((a ^ result) & (a ^ operand) & 0x80) != 0;
-                if (overflow)
-                    self.status |= 0x40
-                else
-                    self.status &= ~@as(u8, 0x40);
+                self.setOverflowFlag(overflow);
 
                 self.crossSleep(base_addr, effective_addr, 3);
             },
@@ -2070,10 +2017,7 @@ pub const CPU = struct {
                 self.negativeBit((result & 0x80) != 0);
 
                 const overflow = ((a ^ result) & (a ^ operand) & 0x80) != 0;
-                if (overflow)
-                    self.status |= 0x40
-                else
-                    self.status &= ~@as(u8, 0x40);
+                self.setOverflowFlag(overflow);
 
                 self.crossSleep(base_addr, effective_addr, 4);
             },
