@@ -85,6 +85,12 @@ pub const CPU = struct {
         return (@as(u16, high) << 8) | low;
     }
 
+    pub fn getByte(self: *Self) u8 {
+        const byte = self.bus.read(self.pc);
+        self.pcIncrement(1);
+        return byte;
+    }
+
     pub fn setZeroNegative(self: *Self, value: u8) void {
         self.zeroBit(value == 0);
         self.negativeBit((value & 0x80) != 0);
@@ -177,8 +183,7 @@ pub const CPU = struct {
                 self.empty_cycles = 6;
             },
             0x01 => { // ORA (Indirect,X)
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
+                const zp_addr = self.getByte();
                 const effective_zp = (zp_addr +% self.x) & 0xFF;
                 const low = self.bus.read(effective_zp);
                 const high = self.bus.read((effective_zp +% 1) & 0xFF);
@@ -192,20 +197,15 @@ pub const CPU = struct {
                 self.empty_cycles = 5;
             },
             0x05 => { // ORA Zero Page
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const value = self.bus.read(zp_addr);
                 self.a |= value;
 
                 self.setZeroNegative(self.a);
-
                 self.empty_cycles = 2;
             },
             0x06 => { // ASL Zero Page
-                const zp_addr_u8 = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr_u8 = self.getByte();
                 const zp_addr: u16 = @intCast(zp_addr_u8);
                 const value = self.bus.read(zp_addr);
                 const carry_out = (value & 0x80) != 0;
@@ -278,9 +278,7 @@ pub const CPU = struct {
                 }
             },
             0x11 => { // ORA (Indirect,Y)
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const low = self.bus.read(zp_addr);
                 const high = self.bus.read((zp_addr +% 1) & 0xFF);
                 const base_addr = (@as(u16, high) << 8) | low;
@@ -293,9 +291,7 @@ pub const CPU = struct {
                 self.crossSleep(base_addr, effective_addr, 4);
             },
             0x15 => { // ORA Zero Page,X
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const effective_addr = (zp_addr +% self.x) & 0xFF;
                 const value = self.bus.read(effective_addr);
                 self.a |= value;
@@ -304,9 +300,7 @@ pub const CPU = struct {
                 self.empty_cycles = 3;
             },
             0x16 => { // ASL Zero Page,X
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const effective_addr = (zp_addr +% self.x) & 0xFF;
                 const value = self.bus.read(effective_addr);
                 const carry_out = (value & 0x80) != 0;
@@ -379,9 +373,7 @@ pub const CPU = struct {
                 self.empty_cycles = 5;
             },
             0x21 => { // AND (Indirect,Y)
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const low = self.bus.read(zp_addr);
                 const high = self.bus.read((zp_addr +% 1) & 0xFF);
                 const base_addr = (@as(u16, high) << 8) | low;
@@ -394,9 +386,7 @@ pub const CPU = struct {
                 self.crossSleep(base_addr, effective_addr, 3);
             },
             0x24 => { // BIT Zero Page
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const value = self.bus.read(zp_addr);
                 const result = self.a & value;
 
@@ -409,9 +399,7 @@ pub const CPU = struct {
                 self.empty_cycles = 2;
             },
             0x25 => { // AND Zero Page
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const value = self.bus.read(zp_addr);
                 self.a &= value;
 
@@ -419,9 +407,7 @@ pub const CPU = struct {
                 self.empty_cycles = 2;
             },
             0x26 => { // ROL Zero Page
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const value = self.bus.read(zp_addr);
                 const carry_in = (self.status & 0x01) != 0;
                 const carry_out = (value & 0x80) != 0;
@@ -510,9 +496,7 @@ pub const CPU = struct {
                 }
             },
             0x31 => { // EOR (Indirect,Y)
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const low = self.bus.read(zp_addr);
                 const high = self.bus.read((zp_addr +% 1) & 0xFF);
                 const base_addr = (@as(u16, high) << 8) | low;
@@ -525,9 +509,7 @@ pub const CPU = struct {
                 self.crossSleep(base_addr, effective_addr, 4);
             },
             0x35 => { // AND Zero Page,X
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const effective_addr = (zp_addr +% self.x) & 0xFF;
                 const value = self.bus.read(effective_addr);
                 self.a &= value;
@@ -588,9 +570,7 @@ pub const CPU = struct {
                 self.empty_cycles = 5;
             },
             0x41 => { // EOR (Indirect,X)
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const effective_zp = (zp_addr +% self.x) & 0xFF;
                 const low = self.bus.read(effective_zp);
                 const high = self.bus.read((effective_zp +% 1) & 0xFF);
@@ -612,9 +592,7 @@ pub const CPU = struct {
                 self.empty_cycles = 4;
             },
             0x45 => { // EOR Zero Page
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const value = self.bus.read(zp_addr);
                 self.a ^= value;
 
@@ -622,9 +600,7 @@ pub const CPU = struct {
                 self.empty_cycles = 2;
             },
             0x46 => { // LSR Zero Page
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const value = self.bus.read(zp_addr);
                 const carry_out = (value & 0x01) != 0;
                 const result = value >> 1;
@@ -706,9 +682,7 @@ pub const CPU = struct {
                 }
             },
             0x51 => { // EOR (Indirect,Y)
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const low = self.bus.read(zp_addr);
                 const high = self.bus.read((zp_addr +% 1) & 0xFF);
                 const base_addr = (@as(u16, high) << 8) | low;
@@ -725,9 +699,7 @@ pub const CPU = struct {
                     self.empty_cycles = 4;
             },
             0x55 => { // EOR Zero Page,X
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const effective_addr = (zp_addr +% self.x) & 0xFF;
                 const value = self.bus.read(effective_addr);
                 self.a ^= value;
@@ -736,9 +708,7 @@ pub const CPU = struct {
                 self.empty_cycles = 3;
             },
             0x56 => { // LSR Zero Page,X
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const effective_addr = (zp_addr +% self.x) & 0xFF;
                 const value = self.bus.read(effective_addr);
                 const carry_out = (value & 0x01) != 0;
@@ -800,9 +770,7 @@ pub const CPU = struct {
                 self.empty_cycles = 5;
             },
             0x61 => { // ADC (Indirect,X)
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const effective_zp = (zp_addr +% self.x) & 0xFF;
                 const low = self.bus.read(effective_zp);
                 const high = self.bus.read((effective_zp +% 1) & 0xFF);
@@ -825,9 +793,7 @@ pub const CPU = struct {
                 self.empty_cycles = 5;
             },
             0x65 => { // ADC Zero Page
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const operand = self.bus.read(zp_addr);
                 const carry = (self.status & 0x01) != 0;
                 const a = self.a;
@@ -845,9 +811,7 @@ pub const CPU = struct {
                 self.empty_cycles = 2;
             },
             0x66 => { // ROR Zero Page
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const value = self.bus.read(zp_addr);
                 const carry_in = (self.status & 0x01) != 0;
                 const carry_out = (value & 0x01) != 0;
@@ -966,9 +930,7 @@ pub const CPU = struct {
                 }
             },
             0x71 => { // ADC (Indirect,Y)
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const low = self.bus.read(zp_addr);
                 const high = self.bus.read((zp_addr +% 1) & 0xFF);
                 const base_addr = (@as(u16, high) << 8) | low;
@@ -990,9 +952,7 @@ pub const CPU = struct {
                 self.crossSleep(base_addr, effective_addr, 4);
             },
             0x75 => { // ADC Zero Page,X
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const effective_addr = (zp_addr +% self.x) & 0xFF;
                 const operand = self.bus.read(effective_addr);
                 const carry = (self.status & 0x01) != 0;
@@ -1010,9 +970,7 @@ pub const CPU = struct {
                 self.empty_cycles = 3;
             },
             0x76 => { // ROR Zero Page,X
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const effective_addr = (zp_addr +% self.x) & 0xFF;
                 const value = self.bus.read(effective_addr);
                 const carry_in = (self.status & 0x01) != 0;
@@ -1087,9 +1045,7 @@ pub const CPU = struct {
                 self.empty_cycles = 6;
             },
             0x81 => { // STA (Indirect,X)
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const effective_zp = (zp_addr +% self.x) & 0xFF;
                 const low = self.bus.read(effective_zp);
                 const high = self.bus.read((effective_zp +% 1) & 0xFF);
@@ -1116,9 +1072,7 @@ pub const CPU = struct {
                 self.empty_cycles = 2;
             },
             0x86 => { // STX Zero Page
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 self.bus.write(zp_addr, self.x);
 
                 self.empty_cycles = 2;
@@ -1167,9 +1121,7 @@ pub const CPU = struct {
                 }
             },
             0x91 => { // STA (Indirect,Y)
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const low = self.bus.read(zp_addr);
                 const high = self.bus.read((zp_addr +% 1) & 0xFF);
                 const base_addr = (@as(u16, high) << 8) | low;
@@ -1180,27 +1132,21 @@ pub const CPU = struct {
                 self.empty_cycles = 5;
             },
             0x94 => { // STY Zero Page, X
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const effective_addr = zp_addr +% self.x;
                 self.bus.write(effective_addr, self.y);
 
                 self.empty_cycles = 3;
             },
             0x95 => { // STA (Store Accumulator, X)
-                const base_addr: u16 = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const base_addr = self.getByte();
                 const addr = @addWithOverflow(base_addr, self.x);
                 self.bus.write(addr[0], self.a);
 
                 self.empty_cycles = 3;
             },
             0x96 => { // STX Zero Page,Y
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const effective_addr = (zp_addr +% self.y) & 0xFF;
                 self.bus.write(effective_addr, self.x);
 
@@ -1245,9 +1191,7 @@ pub const CPU = struct {
                 self.empty_cycles = 1;
             },
             0xA1 => { // LDA (Indirect,X)
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const effective_zp = (zp_addr +% self.x) & 0xFF;
                 const low = self.bus.read(effective_zp);
                 const high = self.bus.read((effective_zp +% 1) & 0xFF);
@@ -1270,9 +1214,7 @@ pub const CPU = struct {
                 self.empty_cycles = 1;
             },
             0xA4 => { // LDY Zero Page
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 self.y = self.bus.read(zp_addr);
 
                 self.zeroBit(self.y == 0);
@@ -1369,9 +1311,7 @@ pub const CPU = struct {
                 }
             },
             0xB1 => { // LDA (Indirect,Y)
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const low = self.bus.read(zp_addr);
                 const high = self.bus.read((zp_addr +% 1) & 0xFF);
                 const base_addr = (@as(u16, high) << 8) | low;
@@ -1385,9 +1325,7 @@ pub const CPU = struct {
                 self.crossSleep(base_addr, effective_addr, 4);
             },
             0xB4 => { // LDY Zero Page,X
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const effective_addr = (zp_addr +% self.x) & 0xFF;
                 self.y = self.bus.read(effective_addr);
 
@@ -1397,9 +1335,7 @@ pub const CPU = struct {
                 self.empty_cycles = 3;
             },
             0xB5 => { // LDA Zero Page,X
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const effective_addr = (zp_addr +% self.x) & 0xFF;
                 self.a = self.bus.read(effective_addr);
 
@@ -1409,9 +1345,7 @@ pub const CPU = struct {
                 self.empty_cycles = 3;
             },
             0xB6 => { // LDX Zero Page,Y
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const effective_addr = (zp_addr +% self.y) & 0xFF;
                 self.x = self.bus.read(effective_addr);
 
@@ -1509,9 +1443,7 @@ pub const CPU = struct {
                 self.empty_cycles = 1;
             },
             0xC1 => { // CMP (Indirect,X)
-                const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const zp_addr = self.getByte();
                 const effective_zp = (zp_addr +% self.x) & 0xFF;
                 const low = self.bus.read(effective_zp);
                 const high = self.bus.read((effective_zp +% 1) & 0xFF);
@@ -1528,8 +1460,6 @@ pub const CPU = struct {
             },
             0xC4 => { // CPY Zero Page
                 const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
                 const value = self.bus.read(zp_addr);
                 const result = self.y -% value;
 
@@ -1541,8 +1471,6 @@ pub const CPU = struct {
             },
             0xC5 => { // CMP Zero Page
                 const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
                 const value = self.bus.read(zp_addr);
                 const result = self.a -% value;
 
@@ -1554,8 +1482,6 @@ pub const CPU = struct {
             },
             0xC6 => { // DEC Zero Page (replacing 0x44)
                 const addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
                 const value = self.bus.read(addr);
                 const result = value - 1;
                 self.bus.write(addr, result);
@@ -1574,8 +1500,6 @@ pub const CPU = struct {
             },
             0xC9 => { // CMP Immediate
                 const value = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
                 const result = self.a -% value;
 
                 self.carryBit(self.a >= value);
@@ -1646,8 +1570,6 @@ pub const CPU = struct {
             },
             0xD1 => { // CMP (Indirect,Y)
                 const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
                 const low = self.bus.read(zp_addr);
                 const high = self.bus.read((zp_addr +% 1) & 0xFF);
                 const base_addr = (@as(u16, high) << 8) | low;
@@ -1664,8 +1586,6 @@ pub const CPU = struct {
             },
             0xD5 => { // CMP Zero Page,X
                 const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
                 const effective_addr = (zp_addr +% self.x) & 0xFF;
                 const value = self.bus.read(effective_addr);
                 const result = self.a -% value;
@@ -1678,8 +1598,6 @@ pub const CPU = struct {
             },
             0xD6 => { // DEC Zero Page,X
                 const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
                 const effective_addr = (zp_addr +% self.x) & 0xFF;
                 const value = self.bus.read(effective_addr);
                 const result = value -% 1;
@@ -1746,8 +1664,6 @@ pub const CPU = struct {
             },
             0xE1 => { // SBC (Indirect,X)
                 const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
                 const low = self.bus.read(zp_addr);
                 const high = self.bus.read((zp_addr +% 1) & 0xFF);
                 const base_addr = (@as(u16, high) << 8) | low;
@@ -1771,8 +1687,6 @@ pub const CPU = struct {
             },
             0xE4 => { // CPX Zero Page
                 const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
                 const value = self.bus.read(zp_addr);
                 const result = self.x -% value;
 
@@ -1784,8 +1698,6 @@ pub const CPU = struct {
             },
             0xE5 => { // SBC Zero Page
                 const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
                 const operand = self.bus.read(zp_addr);
                 const carry = (self.status & 0x01) != 0;
                 const a = self.a;
@@ -1804,8 +1716,6 @@ pub const CPU = struct {
             },
             0xE6 => { // INC Zero Page
                 const zp_addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
                 const value = self.bus.read(zp_addr);
                 const result = value +% 1;
 
