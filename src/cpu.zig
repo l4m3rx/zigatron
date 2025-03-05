@@ -1,6 +1,15 @@
 const std = @import("std");
 const BUS = @import("bus.zig").BUS;
 
+const CarryFlag: u8            = 0b0000_0001; // Bit 0
+const ZeroFlag: u8             = 0b0000_0010;
+const InterruptDisable: u8     = 0b0000_0100;
+const DecimalMode: u8          = 0b0000_1000;
+const BreakCommand: u8         = 0b0001_0000;
+const UnusedFlag: u8           = 0b0010_0000;
+const OverflowFlag: u8         = 0b0100_0000;
+const NegativeFlag: u8         = 0b1000_0000; // Bit 7
+
 pub const CPU = struct {
     alloc: std.mem.Allocator,
     a: u8,      // Accumulator
@@ -58,45 +67,55 @@ pub const CPU = struct {
     pub fn readInstruction(self: *Self) void {
         self.opcode = self.bus.read(self.pc);
         self.pcIncrement(1);
-        // std.debug.print("C:{d:0>4} PC:0x{X:0>4} OP1:0x{X}\n", .{self.cycles, self.pc, self.opcode});
     }
 
     pub fn interruptBit(self: *Self, b: bool) void {
-        if (!b)
-            self.status = self.status & 0b00000100;
+        if (b)
+            self.status |= InterruptDisable
+        else
+            self.status &= ~InterruptDisable;
+    }
+
+    pub fn breakBit(self: *Self, b: bool) void {
+        if (b)
+            self.status |= BreakCommand
+        else
+            self.status &= ~BreakCommand;
     }
 
     pub fn overflowBit(self: *Self, b: bool) void {
-        if (!b)
-            self.status = self.status & 0b01000000;
+        if (b)
+            self.status |= OverflowFlag
+        else
+            self.status &= ~OverflowFlag;
     }
 
     pub fn decimalBit(self: *Self, b: bool) void {
         if (b)
-            self.status = self.status ^ 0b00001000
+            self.status |= DecimalMode
         else
-            self.status = self.status & 0b00001000;
+            self.status &= ~DecimalMode;
     }
 
     pub fn carryBit(self: *Self, b: bool) void {
         if (b)
-            self.status = self.status ^ 0b00000001
+            self.status |= CarryFlag
         else
-            self.status = self.status & 0b11111110;
+            self.status &= ~CarryFlag;
     }
 
     pub fn negativeBit(self: *Self, b: bool) void {
         if (b)
-            self.status = self.status ^ 0b10000000
+            self.status |= NegativeFlag
         else
-            self.status = self.status & 0b01111111;
+            self.status &= ~NegativeFlag;
     }
 
     pub fn zeroBit(self: *Self, b: bool) void {
         if (b)
-            self.status = self.status ^ 0b00000010
+            self.status |= ZeroFlag
         else
-            self.status = self.status & 0b11111101;
+            self.status &= ~ZeroFlag;
     }
 
     pub fn cycle(self: *Self) void {
@@ -498,6 +517,7 @@ pub const CPU = struct {
 
                 self.zeroBit(result == 0);
                 self.negativeBit((value & 0x80) != 0);
+                // TODO: overflow?
                 if (value & 0x40 != 0)
                     self.status |= 0x40
                 else
@@ -690,12 +710,10 @@ pub const CPU = struct {
 
                 const data = self.bus.readRam(self.opcode);
                 self.bus.write(self.opcode, data-1);
+                // TODO Verify this
+                self.zeroBit((data-1) == 0);
+                self.negativeBit(((data-1) & 0x80) != 0);
 
-                if (data == 1) {
-                    self.zeroBit(true);
-                } else if (data == 0) {
-                    self.negativeBit(true);
-                }
                 self.empty_cycles = 4;
             },
             0x45 => { // EOR Zero Page
@@ -957,6 +975,7 @@ pub const CPU = struct {
                 self.carryBit(@as(u16, a) + @as(u16, operand) + @as(u16, carry_val) > 0xFF);
                 self.zeroBit(result == 0);
                 self.negativeBit((result & 0x80) != 0);
+
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
                 if (overflow) {
                     self.status |= 0x40;
@@ -980,6 +999,7 @@ pub const CPU = struct {
                 self.carryBit(@as(u16, a) + @as(u16, operand) + @as(u16, carry_val) > 0xFF);
                 self.zeroBit(result == 0);
                 self.negativeBit((result & 0x80) != 0);
+
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
                 if (overflow) {
                     self.status |= 0x40;
@@ -1028,6 +1048,7 @@ pub const CPU = struct {
                 self.carryBit(@as(u16, a) + @as(u16, operand) + @as(u16, carry_val) > 0xFF);
                 self.zeroBit(result == 0);
                 self.negativeBit((result & 0x80) != 0);
+
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
                 if (overflow) {
                     self.status |= 0x40;
@@ -1090,6 +1111,7 @@ pub const CPU = struct {
                 self.carryBit(@as(u16, a) + @as(u16, operand) + @as(u16, carry_val) > 0xFF);
                 self.zeroBit(result == 0);
                 self.negativeBit((result & 0x80) != 0);
+
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
                 if (overflow)
                     self.status |= 0x40
@@ -2143,7 +2165,7 @@ pub const CPU = struct {
             }
         }
 
-    }
+}
 
     pub fn pcIncrement(self: *Self, p: u16) void {
         self.pc +%= p;
