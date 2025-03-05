@@ -284,8 +284,77 @@ pub const CPU = struct {
                 else
                     self.empty_cycles = 4;
             },
+            0x15 => { // ORA Zero Page,X
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const effective_addr = (zp_addr +% self.x) & 0xFF;
+                const value = self.bus.read(effective_addr);
+                self.a |= value;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                self.empty_cycles = 3;
+            },
+            0x16 => { // ASL Zero Page,X
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const effective_addr = (zp_addr +% self.x) & 0xFF;
+                const value = self.bus.read(effective_addr);
+                const carry_out = (value & 0x80) != 0;
+                const result = value << 1;
+                self.bus.write(effective_addr, result);
+
+                self.carryBit(carry_out);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                self.empty_cycles = 5;
+            },
             0x18 => { // CLC (Clear Carry)
                 self.carryBit(false);
+            },
+            0x19 => { // ORA Absolute,Y
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.y);
+
+                const value = self.bus.read(effective_addr);
+                self.a |= value;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
+                    self.empty_cycles = 4
+                else
+                    self.empty_cycles = 3;
+            },
+            0x1D => { // ORA Absolute,X
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.x);
+
+                const value = self.bus.read(effective_addr);
+                self.a |= value;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
+                    self.empty_cycles = 4
+                else
+                    self.empty_cycles = 3;
             },
             0x20 => { // JSR Absolute
                 const low = self.bus.read(self.pc);
@@ -306,6 +375,26 @@ pub const CPU = struct {
                 self.pc = (@as(u16, high) << 8) | low;
 
                 self.empty_cycles = 5;
+            },
+            0x1E => { // ASL Absolute,X
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.x);
+
+                const value = self.bus.read(effective_addr);
+                const carry_out = (value & 0x80) != 0;
+                const result = value << 1;
+                self.bus.write(effective_addr, result);
+
+                self.carryBit(carry_out);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                self.empty_cycles = 6;
             },
             0x21 => { // AND (Indirect,Y)
                 const zp_addr = self.bus.read(self.pc);
