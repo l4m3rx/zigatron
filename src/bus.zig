@@ -40,7 +40,7 @@ pub const BUS = struct {
     }
 
     pub fn read(self: *BUS, addr: u16) u8 {
-        // TODO: Use enums?
+        // TODO: speed up
         if ((addr >= 0) and (addr <= 0x007F))
             return self.readRam(addr)
         else if ((addr >= 0x80) and (addr <= 0xFF))
@@ -54,13 +54,16 @@ pub const BUS = struct {
     }
 
     pub fn write(self: *BUS, addr: u16, data: u8) void {
-        if ((addr >= 0) and (addr <= 0x00FF))
+        if ((addr >= 0x80) and (addr <= 0x00FF))
             self.ram.write(addr, data)
-        else if ((addr >= 0xE000) and (addr <= 0x1FFF))
-            self.bus[addr] = data
+        else if ((addr >= 0x1000) and (addr <= 0x1FFF))
+            self.car.write(addr, data)
         else
             std.debug.print("[warn]: Unhandled write request [Address: 0x{X}]\n", .{addr});
             return;
     }
+    // 0x0000 - 0x007F - TIA Registers
+    // 0x0200 - 0x02FF - RIOT Registers
+    // 0x1000 - 0x1FFF - ROM
 };
 

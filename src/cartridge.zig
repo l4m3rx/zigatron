@@ -2,7 +2,7 @@ const std = @import("std");
 
 pub const Cartridge = struct {
     allocator: std.mem.Allocator,
-    rom: []const u8,
+    rom: []u8,
     size: usize,
 
     const Self = @This();
@@ -40,6 +40,11 @@ pub const Cartridge = struct {
             }
         }
         return 0;
+    }
+
+    // Write to ROM (ram?)
+    pub fn write(self: *Cartridge, addr: u16, data: u8) void {
+        self.rom[addr] = data;
     }
 
     // Read a little-endian u16 from a byte slice
