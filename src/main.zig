@@ -27,7 +27,7 @@ pub fn main() !void {
     bus.reset();
 
     cart.printInfo();
-    cart.dumpRom(cart.size);
+    // cart.dumpRom(cart.size);
 
     if (cart.getEntryPoint()) |entrypoint|
         cpu.reset(entrypoint);
