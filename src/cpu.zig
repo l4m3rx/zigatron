@@ -76,6 +76,15 @@ pub const CPU = struct {
             self.empty_cycles = s;
     }
 
+    pub fn getWord(self: *Self) u16 {
+        const low = self.bus.read(self.pc);
+        self.pcIncrement(1);
+        const high = self.bus.read(self.pc);
+        self.pcIncrement(1);
+
+        return (@as(u16, high) << 8) | low;
+    }
+
     pub fn interruptBit(self: *Self, b: bool) void {
         if (b)
             self.status |= InterruptDisable
@@ -235,13 +244,9 @@ pub const CPU = struct {
                 self.empty_cycles = 1;
             },
             0x0D => { // ORA Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const addr = (@as(u16, high) << 8) | low;
+                const addr = self.getWord();
                 const value = self.bus.read(addr);
+
                 self.a |= value;
 
                 self.zeroBit(self.a == 0);
@@ -250,12 +255,7 @@ pub const CPU = struct {
                 self.empty_cycles = 3;
             },
             0x0E => { // ASL Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const addr = (@as(u16, high) << 8) | low;
+                const addr = self.getWord();
                 const value = self.bus.read(addr);
                 const carry_out = (value & 0x80) != 0;
                 const result = value << 1;
@@ -329,12 +329,7 @@ pub const CPU = struct {
                 self.carryBit(false);
             },
             0x19 => { // ORA Absolute,Y
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const base_addr = (@as(u16, high) << 8) | low;
+                const base_addr = self.getWord();
                 const effective_addr = base_addr +% @as(u16, self.y);
 
                 const value = self.bus.read(effective_addr);
@@ -349,12 +344,7 @@ pub const CPU = struct {
                     self.empty_cycles = 3;
             },
             0x1D => { // ORA Absolute,X
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const base_addr = (@as(u16, high) << 8) | low;
+                const base_addr = self.getWord();
                 const effective_addr = base_addr +% @as(u16, self.x);
 
                 const value = self.bus.read(effective_addr);
@@ -369,12 +359,7 @@ pub const CPU = struct {
                     self.empty_cycles = 3;
             },
             0x1E => { // ASL Absolute,X
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const base_addr = (@as(u16, high) << 8) | low;
+                const base_addr = self.getWord();
                 const effective_addr = base_addr +% @as(u16, self.x);
 
                 const value = self.bus.read(effective_addr);
@@ -389,11 +374,7 @@ pub const CPU = struct {
                 self.empty_cycles = 6;
             },
             0x20 => { // JSR Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
+                const addr = self.getWord();
                 const return_addr = self.pc;
                 const temp_sp: u16 = self.sp;
                 const sp_addr: u16 = 0x100 + temp_sp;
@@ -403,7 +384,7 @@ pub const CPU = struct {
                 self.bus.write(sp_addr, @intCast(return_addr & 0xFF));
                 self.sp -%= 1;
 
-                self.pc = (@as(u16, high) << 8) | low;
+                self.pc = addr;
 
                 self.empty_cycles = 5;
             },
@@ -500,12 +481,7 @@ pub const CPU = struct {
                 self.empty_cycles = 1;
             },
             0x2C => { // BIT Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const addr = (@as(u16, high) << 8) | low;
+                const addr = self.getWord();
                 const value = self.bus.read(addr);
                 const result = self.a & value;
 
@@ -520,12 +496,7 @@ pub const CPU = struct {
                 self.empty_cycles = 3;
             },
             0x2D => { // AND Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const addr = (@as(u16, high) << 8) | low;
+                const addr = self.getWord();
                 const value = self.bus.read(addr);
                 self.a &= value;
 
@@ -535,12 +506,7 @@ pub const CPU = struct {
                 self.empty_cycles = 3;
             },
             0x2E => { // ROL Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const addr = (@as(u16, high) << 8) | low;
+                const addr = self.getWord();
                 const value = self.bus.read(addr);
                 const carry_in = (self.status & 0x01) != 0;
                 const carry_out = (value & 0x80) != 0;
@@ -600,12 +566,7 @@ pub const CPU = struct {
                 self.carryBit(true);
             },
             0x39 => { // AND Absolute,Y
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const base_addr = (@as(u16, high) << 8) | low;
+                const base_addr = self.getWord();
                 const effective_addr = base_addr +% @as(u16, self.y);
 
                 const value = self.bus.read(effective_addr);
@@ -617,12 +578,7 @@ pub const CPU = struct {
                 self.crossSleep(base_addr, effective_addr, 3);
             },
             0x3D => { // AND Absolute,X
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const base_addr = (@as(u16, high) << 8) | low;
+                const base_addr = self.getWord();
                 const effective_addr = base_addr +% @as(u16, self.x);
 
                 const value = self.bus.read(effective_addr);
@@ -634,12 +590,7 @@ pub const CPU = struct {
                 self.crossSleep(base_addr, effective_addr, 3);
             },
             0x3E => { // ROL Absolute,X
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const base_addr = (@as(u16, high) << 8) | low;
+                const base_addr = self.getWord();
                 const effective_addr = base_addr +% @as(u16, self.x);
 
                 const value = self.bus.read(effective_addr);
@@ -752,24 +703,11 @@ pub const CPU = struct {
                 self.empty_cycles = 1;
             },
             0x4C => { // JMP (Absolute Jump)
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                self.pc = (@as(u16, high) << 8) | low;
-
+                self.pc = self.getWord();
                 self.empty_cycles = 1;
-                std.debug.print("Jumping to address 0x{X}\n", .{self.pc});
             },
             0x4D => { // EOR Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const addr = (@as(u16, high) << 8) | low;
+                const addr = self.getWord();
                 const value = self.bus.read(addr);
                 self.a ^= value;
 
@@ -779,12 +717,7 @@ pub const CPU = struct {
                 self.empty_cycles = 3;
             },
             0x4E => { // LSR Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const addr = (@as(u16, high) << 8) | low;
+                const addr = self.getWord();
                 const value = self.bus.read(addr);
                 const carry_out = (value & 0x01) != 0;
                 const result = value >> 1;
@@ -867,12 +800,7 @@ pub const CPU = struct {
                 self.interruptBit(false);
             },
             0x59 => { // EOR Absolute,Y
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const base_addr = (@as(u16, high) << 8) | low;
+                const base_addr = self.getWord();
                 const effective_addr = base_addr +% @as(u16, self.y);
 
                 const value = self.bus.read(effective_addr);
@@ -884,12 +812,7 @@ pub const CPU = struct {
                 self.crossSleep(base_addr, effective_addr, 3);
             },
             0x5D => { // EOR Absolute,X
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const base_addr = (@as(u16, high) << 8) | low;
+                const base_addr = self.getWord();
                 const effective_addr = base_addr +% @as(u16, self.x);
 
                 const value = self.bus.read(effective_addr);
@@ -901,12 +824,7 @@ pub const CPU = struct {
                 self.crossSleep(base_addr, effective_addr, 3);
             },
             0x5E => { // LSR Absolute,X
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const base_addr = (@as(u16, high) << 8) | low;
+                const base_addr = self.getWord();
                 const effective_addr = base_addr +% @as(u16, self.x);
 
                 const value = self.bus.read(effective_addr);
@@ -1049,12 +967,7 @@ pub const CPU = struct {
                 // Useful for dynamic jumps (e.g., jump tables), but it has a known bug on the original 6502: if the low byte is at $xxFF (e.g., $12FF),
                 // the high byte is incorrectly fetched from $1200 instead of $1300. This quirk is present in the 6507 too.
                 //
-                const addr_low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const addr_high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const indirect_addr = (@as(u16, addr_high) << 8) | addr_low;
-
+                const indirect_addr = self.getWord();
                 const page = indirect_addr & 0xFF00;
                 const offset = indirect_addr & 0x00FF;
 
@@ -1069,12 +982,7 @@ pub const CPU = struct {
                 self.empty_cycles = 4;
             },
             0x6D => { // ADC Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const addr = (@as(u16, high) << 8) | low;
+                const addr = self.getWord();
                 const operand = self.bus.read(addr);
                 const carry = (self.status & 0x01) != 0;
                 const a = self.a;
@@ -1095,12 +1003,7 @@ pub const CPU = struct {
                 self.empty_cycles = 3;
             },
             0x6E => { // ROR Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const addr = (@as(u16, high) << 8) | low;
+                const addr = self.getWord();
                 const value = self.bus.read(addr);
                 const carry_in = (self.status & 0x01) != 0;
                 const carry_out = (value & 0x01) != 0;
@@ -1200,12 +1103,7 @@ pub const CPU = struct {
                 self.empty_cycles = 1;
             },
             0x79 => { // ADC Absolute,Y
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const base_addr = (@as(u16, high) << 8) | low;
+                const base_addr = self.getWord();
                 const effective_addr = base_addr +% @as(u16, self.y);
 
                 const operand = self.bus.read(effective_addr);
@@ -1228,12 +1126,7 @@ pub const CPU = struct {
                 self.crossSleep(base_addr, effective_addr, 3);
             },
             0x7D => { // ADC Absolute,X
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const base_addr = (@as(u16, high) << 8) | low;
+                const base_addr = self.getWord();
                 const effective_addr = base_addr +% @as(u16, self.x);
 
                 const operand = self.bus.read(effective_addr);
@@ -1256,12 +1149,7 @@ pub const CPU = struct {
                 self.crossSleep(base_addr, effective_addr, 3);
             },
             0x7E => { // ROR Absolute,X
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const base_addr = (@as(u16, high) << 8) | low;
+                const base_addr = self.getWord();
                 const effective_addr = base_addr +% @as(u16, self.x);
 
                 const value = self.bus.read(effective_addr);
@@ -1331,36 +1219,18 @@ pub const CPU = struct {
                 self.empty_cycles = 1;
             },
             0x8C => { // STY Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const addr = (@as(u16, high) << 8) | low;
+                const addr = self.getWord();
                 self.bus.write(addr, self.y);
-
                 self.empty_cycles = 3;
             },
             0x8D => { // STA Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const addr = (@as(u16, high) << 8) | low;
+                const addr = self.getWord();
                 self.bus.write(addr, self.a);
-
                 self.empty_cycles = 3;
             },
             0x8E => { // STX Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const addr = (@as(u16, high) << 8) | low;
+                const addr = self.getWord();
                 self.bus.write(addr, self.x);
-
                 self.empty_cycles = 3;
             },
             0x90 => { // BCC - Branch if Carry Clear
@@ -1424,12 +1294,7 @@ pub const CPU = struct {
                 self.empty_cycles = 1;
             },
             0x99 => { // STA Absolute,Y
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const base_addr = (@as(u16, high) << 8) | low;
+                const base_addr = self.getWord();
                 const effective_addr = base_addr +% @as(u16, self.y);
 
                 self.bus.write(effective_addr, self.a);
@@ -1441,12 +1306,7 @@ pub const CPU = struct {
                 self.empty_cycles = 1;
             },
             0x9D => { // STA Absolute,X
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const base_addr = (@as(u16, high) << 8) | low;
+                const base_addr = self.getWord();
                 const effective_addr = base_addr +% @as(u16, self.x);
 
                 self.bus.write(effective_addr, self.a);
@@ -1547,12 +1407,7 @@ pub const CPU = struct {
                 self.empty_cycles = 1;
             },
             0xAC => { // LDY Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const addr = (@as(u16, high) << 8) | low;
+                const addr = self.getWord();
                 const value = self.bus.read(addr);
                 self.y = value;
 
@@ -1562,12 +1417,7 @@ pub const CPU = struct {
                 self.empty_cycles = 3;
             },
             0xAD => { // LDA Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                // Form the 16-bit address (little-endian)
-                const addr = (@as(u16, high) << 8) | low;
+                const addr = self.getWord();
                 const value = self.bus.read(addr);
                 self.a = value;
 
@@ -1577,12 +1427,7 @@ pub const CPU = struct {
                 self.empty_cycles = 3;
             },
             0xAE => { // LDX Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const addr = (@as(u16, high) << 8) | low;
+                const addr = self.getWord();
                 self.x = self.bus.read(addr);
 
                 self.zeroBit(self.x == 0);
@@ -1658,12 +1503,7 @@ pub const CPU = struct {
                 self.overflowBit(false);
             },
             0xB9 => { // LDA Absolute,Y
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const base_addr = (@as(u16, high) << 8) | low;
+                const base_addr = self.getWord();
                 const effective_addr = base_addr +% @as(u16, self.y);
 
                 self.a = self.bus.read(effective_addr);
@@ -1682,12 +1522,7 @@ pub const CPU = struct {
                 self.empty_cycles = 1; // 2 cycles total
             },
             0xBC => { // LDY Absolute,X
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const base_addr = (@as(u16, high) << 8) | low;
+                const base_addr = self.getWord();
                 const effective_addr = base_addr +% @as(u16, self.x);
 
                 self.y = self.bus.read(effective_addr);
@@ -1836,12 +1671,7 @@ pub const CPU = struct {
                 self.empty_cycles = 1;
             },
             0xCC => { // CPY Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const addr = (@as(u16, high) << 8) | low;
+                const addr = self.getWord();
                 const value = self.bus.read(addr);
                 const result = self.y -% value;
 
@@ -1852,12 +1682,7 @@ pub const CPU = struct {
                 self.empty_cycles = 3;
             },
             0xCD => { // CMP Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const addr = (@as(u16, high) << 8) | low;
+                const addr = self.getWord();
                 const value = self.bus.read(addr);
                 const result = self.a -% value;
 
@@ -1868,12 +1693,7 @@ pub const CPU = struct {
                 self.empty_cycles = 3;
             },
             0xCE => { // DEC Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const addr = (@as(u16, high) << 8) | low;
+                const addr = self.getWord();
                 const value = self.bus.read(addr);
                 const result = value -% 1;
 
@@ -1953,12 +1773,7 @@ pub const CPU = struct {
                 self.decimalBit(false);
             },
             0xD9 => { // CMP Absolute,Y
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const base_addr = (@as(u16, high) << 8) | low;
+                const base_addr = self.getWord();
                 const effective_addr = base_addr +% @as(u16, self.y);
 
                 const value = self.bus.read(effective_addr);
@@ -1971,12 +1786,7 @@ pub const CPU = struct {
                 self.crossSleep(base_addr, effective_addr, 3);
             },
             0xDD => { // CMP Absolute,X
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const base_addr = (@as(u16, high) << 8) | low;
+                const base_addr = self.getWord();
                 const effective_addr = base_addr +% @as(u16, self.x);
 
                 const value = self.bus.read(effective_addr);
@@ -1989,12 +1799,7 @@ pub const CPU = struct {
                 self.crossSleep(base_addr, effective_addr, 3);
             },
             0xDE => { // DEC Absolute,X
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const base_addr = (@as(u16, high) << 8) | low;
+                const base_addr = self.getWord();
                 const effective_addr = base_addr +% @as(u16, self.x);
 
                 const value = self.bus.read(effective_addr);
@@ -2133,12 +1938,7 @@ pub const CPU = struct {
                 self.empty_cycles = 1;
             },
             0xEC => { // CPX Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const addr = (@as(u16, high) << 8) | low;
+                const addr = self.getWord();
                 const value = self.bus.read(addr);
                 const result = self.x -% value;
 
@@ -2149,12 +1949,7 @@ pub const CPU = struct {
                 self.empty_cycles = 3;
             },
             0xED => { // SBC Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const addr = (@as(u16, high) << 8) | low;
+                const addr = self.getWord();
                 const operand = self.bus.read(addr);
                 const carry = (self.status & 0x01) != 0;
                 const a = self.a;
@@ -2175,12 +1970,7 @@ pub const CPU = struct {
                 self.empty_cycles = 3;
             },
             0xEE => { // INC Absolute
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const addr = (@as(u16, high) << 8) | low;
+                const addr = self.getWord();
                 const value = self.bus.read(addr);
                 const new_value = value +% 1;
                 self.bus.write(addr , new_value);
@@ -2278,13 +2068,7 @@ pub const CPU = struct {
                 self.decimalBit(true);
             },
             0xF9 => { // SBC Absolute,Y
-                // Fetch the 16-bit base address
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const base_addr = (@as(u16, high) << 8) | low;
+                const base_addr = self.getWord();
                 const effective_addr = base_addr +% @as(u16, self.y);
 
                 const operand = self.bus.read(effective_addr);
@@ -2307,12 +2091,7 @@ pub const CPU = struct {
                 self.crossSleep(base_addr, effective_addr, 3);
             },
             0xFE => { // INC Absolute,X
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const base_addr = (@as(u16, high) << 8) | low;
+                const base_addr = self.getWord();
                 const effective_addr = base_addr +% @as(u16, self.x);
 
                 const value = self.bus.read(effective_addr);
@@ -2325,12 +2104,7 @@ pub const CPU = struct {
                 self.empty_cycles = 6;
             },
             0xFD => { // SBC Absolute,X
-                const low = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                const high = self.bus.read(self.pc);
-                self.pcIncrement(1);
-
-                const base_addr = (@as(u16, high) << 8) | low;
+                const base_addr = self.getWord();
                 const effective_addr = base_addr +% @as(u16, self.x);
 
                 const operand = self.bus.read(effective_addr);
