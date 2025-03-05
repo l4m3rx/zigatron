@@ -1,14 +1,14 @@
 const std = @import("std");
 const BUS = @import("bus.zig").BUS;
 
-const CarryFlag: u8            = 0b0000_0001; // Bit 0
-const ZeroFlag: u8             = 0b0000_0010;
-const InterruptDisable: u8     = 0b0000_0100;
-const DecimalMode: u8          = 0b0000_1000;
-const BreakCommand: u8         = 0b0001_0000;
-const UnusedFlag: u8           = 0b0010_0000;
-const OverflowFlag: u8         = 0b0100_0000;
-const NegativeFlag: u8         = 0b1000_0000; // Bit 7
+const CarryFlag: u8            = 0b00000001; // Bit 0
+const ZeroFlag: u8             = 0b00000010;
+const InterruptDisable: u8     = 0b00000100;
+const DecimalMode: u8          = 0b00001000;
+// const BreakCommand: u8         = 0b00010000;
+// const UnusedFlag: u8           = 0b00100000;
+const OverflowFlag: u8         = 0b01000000;
+const NegativeFlag: u8         = 0b10000000; // Bit 7
 
 pub const CPU = struct {
     alloc: std.mem.Allocator,
@@ -118,13 +118,6 @@ pub const CPU = struct {
             self.status |= InterruptDisable
         else
             self.status &= ~InterruptDisable;
-    }
-
-    pub fn breakBit(self: *Self, b: bool) void {
-        if (b)
-            self.status |= BreakCommand
-        else
-            self.status &= ~BreakCommand;
     }
 
     pub fn overflowBit(self: *Self, b: bool) void {
