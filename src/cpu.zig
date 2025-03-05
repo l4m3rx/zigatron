@@ -85,6 +85,11 @@ pub const CPU = struct {
         return (@as(u16, high) << 8) | low;
     }
 
+    pub fn setZeroNegative(self: *Self, value: u8) void {
+        self.zeroBit(value == 0);
+        self.negativeBit((value & 0x80) != 0);
+    }
+
     pub fn interruptBit(self: *Self, b: bool) void {
         if (b)
             self.status |= InterruptDisable
@@ -182,8 +187,7 @@ pub const CPU = struct {
                 const value = self.bus.read(effective_addr);
                 self.a |= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
+                self.setZeroNegative(self.a);
 
                 self.empty_cycles = 5;
             },
@@ -194,8 +198,7 @@ pub const CPU = struct {
                 const value = self.bus.read(zp_addr);
                 self.a |= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
+                self.setZeroNegative(self.a);
 
                 self.empty_cycles = 2;
             },
@@ -210,8 +213,7 @@ pub const CPU = struct {
                 self.bus.write(zp_addr, result);
 
                 self.carryBit(carry_out);
-                self.zeroBit(result == 0);
-                self.negativeBit((result & 0x80) != 0);
+                self.setZeroNegative(result);
 
                 self.empty_cycles = 4;
             },
@@ -228,8 +230,7 @@ pub const CPU = struct {
 
                 self.a |= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
+                self.setZeroNegative(self.a);
 
                 self.empty_cycles = 1;
             },
@@ -238,8 +239,7 @@ pub const CPU = struct {
                 self.a = self.a << 1;
                 self.carryBit(carry);
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
+                self.setZeroNegative(self.a);
 
                 self.empty_cycles = 1;
             },
@@ -249,8 +249,7 @@ pub const CPU = struct {
 
                 self.a |= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
+                self.setZeroNegative(self.a);
 
                 self.empty_cycles = 3;
             },
@@ -262,8 +261,7 @@ pub const CPU = struct {
                 self.bus.write(addr, result);
 
                 self.carryBit(carry_out);
-                self.zeroBit(result == 0);
-                self.negativeBit((result & 0x80) != 0);
+                self.setZeroNegative(self.a);
 
                 self.empty_cycles = 5;
             },
@@ -291,9 +289,7 @@ pub const CPU = struct {
                 const value = self.bus.read(effective_addr);
                 self.a |= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
-
+                self.setZeroNegative(self.a);
                 self.crossSleep(base_addr, effective_addr, 4);
             },
             0x15 => { // ORA Zero Page,X
@@ -304,9 +300,7 @@ pub const CPU = struct {
                 const value = self.bus.read(effective_addr);
                 self.a |= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
-
+                self.setZeroNegative(self.a);
                 self.empty_cycles = 3;
             },
             0x16 => { // ASL Zero Page,X
@@ -320,8 +314,7 @@ pub const CPU = struct {
                 self.bus.write(effective_addr, result);
 
                 self.carryBit(carry_out);
-                self.zeroBit(result == 0);
-                self.negativeBit((result & 0x80) != 0);
+                self.setZeroNegative(self.a);
 
                 self.empty_cycles = 5;
             },
@@ -335,8 +328,7 @@ pub const CPU = struct {
                 const value = self.bus.read(effective_addr);
                 self.a |= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
+                self.setZeroNegative(self.a);
 
                 if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
                     self.empty_cycles = 4
@@ -350,8 +342,7 @@ pub const CPU = struct {
                 const value = self.bus.read(effective_addr);
                 self.a |= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
+                self.setZeroNegative(self.a);
 
                 if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
                     self.empty_cycles = 4
@@ -368,8 +359,7 @@ pub const CPU = struct {
                 self.bus.write(effective_addr, result);
 
                 self.carryBit(carry_out);
-                self.zeroBit(result == 0);
-                self.negativeBit((result & 0x80) != 0);
+                self.setZeroNegative(result);
 
                 self.empty_cycles = 6;
             },
@@ -400,9 +390,7 @@ pub const CPU = struct {
                 const value = self.bus.read(effective_addr);
                 self.a &= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
-
+                self.setZeroNegative(self.a);
                 self.crossSleep(base_addr, effective_addr, 3);
             },
             0x24 => { // BIT Zero Page
@@ -412,8 +400,7 @@ pub const CPU = struct {
                 const value = self.bus.read(zp_addr);
                 const result = self.a & value;
 
-                self.zeroBit(result == 0);
-                self.negativeBit((value & 0x80) != 0);
+                self.setZeroNegative(result);
                 if (value & 0x40 != 0)
                     self.status |= 0x40
                 else
@@ -428,9 +415,7 @@ pub const CPU = struct {
                 const value = self.bus.read(zp_addr);
                 self.a &= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
-
+                self.setZeroNegative(self.a);
                 self.empty_cycles = 2;
             },
             0x26 => { // ROL Zero Page
@@ -446,8 +431,7 @@ pub const CPU = struct {
                 self.bus.write(zp_addr, result);
 
                 self.carryBit(carry_out);
-                self.zeroBit(result == 0);
-                self.negativeBit((result & 0x80) != 0);
+                self.setZeroNegative(result);
 
                 self.empty_cycles = 4;
             },
@@ -463,9 +447,7 @@ pub const CPU = struct {
 
                 self.a &= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
-
+                self.setZeroNegative(self.a);
                 self.empty_cycles = 1;
             },
             0x2A => { // ROL Accumulator
@@ -475,8 +457,7 @@ pub const CPU = struct {
                 self.a = (self.a << 1) | carry_bit;
 
                 self.carryBit(carry_out);
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
+                self.setZeroNegative(self.a);
 
                 self.empty_cycles = 1;
             },
@@ -485,8 +466,7 @@ pub const CPU = struct {
                 const value = self.bus.read(addr);
                 const result = self.a & value;
 
-                self.zeroBit(result == 0);
-                self.negativeBit((value & 0x80) != 0);
+                self.setZeroNegative(result);
                 // TODO: overflow?
                 if (value & 0x40 != 0)
                     self.status |= 0x40
@@ -500,9 +480,7 @@ pub const CPU = struct {
                 const value = self.bus.read(addr);
                 self.a &= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
-
+                self.setZeroNegative(self.a);
                 self.empty_cycles = 3;
             },
             0x2E => { // ROL Absolute
@@ -515,8 +493,7 @@ pub const CPU = struct {
 
                 self.bus.write(addr, result);
                 self.carryBit(carry_out);
-                self.zeroBit(result == 0);
-                self.negativeBit((result & 0x80) != 0);
+                self.setZeroNegative(result);
 
                 self.empty_cycles = 5;
             },
@@ -544,9 +521,7 @@ pub const CPU = struct {
                 const value = self.bus.read(effective_addr);
                 self.a ^= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
-
+                self.setZeroNegative(self.a);
                 self.crossSleep(base_addr, effective_addr, 4);
             },
             0x35 => { // AND Zero Page,X
@@ -557,9 +532,7 @@ pub const CPU = struct {
                 const value = self.bus.read(effective_addr);
                 self.a &= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
-
+                self.setZeroNegative(self.a);
                 self.empty_cycles = 3;
             },
             0x38 => { // SEC (Set Carry)
@@ -572,9 +545,7 @@ pub const CPU = struct {
                 const value = self.bus.read(effective_addr);
                 self.a &= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
-
+                self.setZeroNegative(self.a);
                 self.crossSleep(base_addr, effective_addr, 3);
             },
             0x3D => { // AND Absolute,X
@@ -584,9 +555,7 @@ pub const CPU = struct {
                 const value = self.bus.read(effective_addr);
                 self.a &= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
-
+                self.setZeroNegative(self.a);
                 self.crossSleep(base_addr, effective_addr, 3);
             },
             0x3E => { // ROL Absolute,X
@@ -601,8 +570,7 @@ pub const CPU = struct {
 
                 self.bus.write(effective_addr, result);
                 self.carryBit(carry_out);
-                self.zeroBit(result == 0);
-                self.negativeBit((result & 0x80) != 0);
+                self.setZeroNegative(self.a);
 
                 self.empty_cycles = 6;
             },
@@ -631,9 +599,7 @@ pub const CPU = struct {
                 const value = self.bus.read(effective_addr);
                 self.a ^= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
-
+                self.setZeroNegative(self.a);
                 self.empty_cycles = 5;
             },
             0x44 => { // DEC (Decrement memory)
@@ -642,9 +608,7 @@ pub const CPU = struct {
                 const data = self.bus.readRam(self.opcode);
                 self.bus.write(self.opcode, data-1);
                 // TODO Verify this
-                self.zeroBit((data-1) == 0);
-                self.negativeBit(((data-1) & 0x80) != 0);
-
+                self.setZeroNegative(data-1);
                 self.empty_cycles = 4;
             },
             0x45 => { // EOR Zero Page
@@ -654,9 +618,7 @@ pub const CPU = struct {
                 const value = self.bus.read(zp_addr);
                 self.a ^= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
-
+                self.setZeroNegative(self.a);
                 self.empty_cycles = 2;
             },
             0x46 => { // LSR Zero Page
@@ -687,9 +649,7 @@ pub const CPU = struct {
 
                 self.a ^= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
-
+                self.setZeroNegative(self.a);
                 self.empty_cycles = 1;
             },
             0x4A => { // LSR Accumulator
@@ -711,9 +671,7 @@ pub const CPU = struct {
                 const value = self.bus.read(addr);
                 self.a ^= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
-
+                self.setZeroNegative(self.a);
                 self.empty_cycles = 3;
             },
             0x4E => { // LSR Absolute
@@ -759,8 +717,7 @@ pub const CPU = struct {
                 const value = self.bus.read(effective_addr);
                 self.a ^= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
+                self.setZeroNegative(self.a);
 
                 if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
                     self.empty_cycles = 5
@@ -775,9 +732,7 @@ pub const CPU = struct {
                 const value = self.bus.read(effective_addr);
                 self.a ^= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
-
+                self.setZeroNegative(self.a);
                 self.empty_cycles = 3;
             },
             0x56 => { // LSR Zero Page,X
@@ -806,9 +761,7 @@ pub const CPU = struct {
                 const value = self.bus.read(effective_addr);
                 self.a ^= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
-
+                self.setZeroNegative(self.a);
                 self.crossSleep(base_addr, effective_addr, 3);
             },
             0x5D => { // EOR Absolute,X
@@ -818,9 +771,7 @@ pub const CPU = struct {
                 const value = self.bus.read(effective_addr);
                 self.a ^= value;
 
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
-
+                self.setZeroNegative(self.a);
                 self.crossSleep(base_addr, effective_addr, 3);
             },
             0x5E => { // LSR Absolute,X
