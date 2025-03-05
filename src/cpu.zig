@@ -1399,6 +1399,19 @@ pub const CPU = struct {
                     self.empty_cycles = 1;
                 }
             },
+            0x91 => { // STA (Indirect,Y)
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const low = self.bus.read(zp_addr);
+                const high = self.bus.read((zp_addr +% 1) & 0xFF);
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.y);
+
+                self.bus.write(effective_addr, self.a);
+
+                self.empty_cycles = 5;
+            },
             0x94 => { // STY Zero Page, X
                 const zp_addr = self.bus.read(self.pc);
                 self.pcIncrement(1);
@@ -1417,9 +1430,52 @@ pub const CPU = struct {
 
                 self.empty_cycles = 3;
             },
+            0x96 => { // STX Zero Page,Y
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const effective_addr = (zp_addr +% self.y) & 0xFF;
+                self.bus.write(effective_addr, self.x);
+
+                self.empty_cycles = 3;
+            },
+            0x98 => { // TYA - Transfer Y to Accumulator
+                self.a = self.y;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                self.empty_cycles = 1;
+            },
+            0x99 => { // STA Absolute,Y
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.y);
+
+                self.bus.write(effective_addr, self.a);
+
+                self.empty_cycles = 4;
+            },
             0x9A => { // TXS - Transfer X to Stack Pointer
                 self.sp = self.x;
                 self.empty_cycles = 1;
+            },
+            0x9D => { // STA Absolute,X
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.x);
+
+                self.bus.write(effective_addr, self.a);
+
+                self.empty_cycles = 4;
             },
             0xA0 => { // LDY Immediate
                 const value = self.bus.read(self.pc);
