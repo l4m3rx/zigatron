@@ -663,6 +663,61 @@ pub const CPU = struct {
                     self.empty_cycles = 1;
                 }
             },
+            0xF1 => { // SBC (Indirect,Y)
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const low = self.bus.read(zp_addr);
+                const high = self.bus.read((zp_addr +% 1) & 0xFF);
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.y);
+
+                const operand = self.bus.read(effective_addr);
+                const carry = (self.status & 0x01) != 0;
+                const a = self.a;
+                const borrow: u8 = if (carry) 0 else 1;
+                const result = a -% operand -% borrow;
+                self.a = result;
+
+                self.carryBit(a >= (operand +% borrow));
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                const overflow = ((a ^ result) & (a ^ operand) & 0x80) != 0;
+                if (overflow)
+                    self.status |= 0x40
+                else
+                    self.status &= ~@as(u8, 0x40);
+
+                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
+                    self.empty_cycles = 5
+                else
+                    self.empty_cycles = 4;
+            },
+            0xF5 => { // SBC Zero Page,X
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const effective_addr = (zp_addr +% self.x) & 0xFF;
+                const operand = self.bus.read(effective_addr);
+                const carry = (self.status & 0x01) != 0;
+                const a = self.a;
+                const borrow: u8 = if (carry) 0 else 1;
+                const result = a -% operand -% borrow;
+                self.a = result;
+
+                self.carryBit(a >= (operand +% borrow));
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                const overflow = ((a ^ result) & (a ^ operand) & 0x80) != 0;
+                if (overflow)
+                    self.status |= 0x40
+                else
+                    self.status &= ~@as(u8, 0x40);
+
+                self.empty_cycles = 3;
+            },
             0xF6 => { // INC Zero Page, X
                 const zp_addr = self.bus.read(self.pc);
                 self.pcIncrement(1);
@@ -680,6 +735,38 @@ pub const CPU = struct {
             },
             0xF8 => { // SED (Set Decimal)
                 self.decimalBit(true);
+            },
+            0xF9 => { // SBC Absolute,Y
+                // Fetch the 16-bit base address
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.y);
+
+                const operand = self.bus.read(effective_addr);
+
+                const carry = (self.status & 0x01) != 0; // Carry flag (bit 0)
+                const a = self.a;
+                const borrow: u8 = if (carry) 0 else 1;
+                const result = a -% operand -% borrow;
+                self.a = result;
+
+                self.carryBit(a >= (operand +% borrow));       // Carry: no borrow
+                self.zeroBit(result == 0);                     // Zero: result is 0
+                self.negativeBit((result & 0x80) != 0);        // Negative: bit 7 set
+                const overflow = ((a ^ result) & (a ^ operand) & 0x80) != 0;
+                if (overflow)
+                    self.status |= 0x40
+                else
+                    self.status &= ~@as(u8, 0x40);
+
+                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
+                    self.empty_cycles = 4
+                else
+                    self.empty_cycles = 3;
             },
             0xFE => { // INC Absolute,X
                 const low = self.bus.read(self.pc);
