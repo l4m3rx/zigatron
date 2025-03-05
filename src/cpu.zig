@@ -2015,6 +2015,66 @@ pub const CPU = struct {
             0xD8 => { // CLD (Clear Decimal)
                 self.decimalBit(false);
             },
+            0xD9 => { // CMP Absolute,Y
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.y);
+
+                const value = self.bus.read(effective_addr);
+                const result = self.a -% value;
+
+                self.carryBit(self.a >= value);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
+                    self.empty_cycles = 4
+                else
+                    self.empty_cycles = 3;
+            },
+            0xDD => { // CMP Absolute,X
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.x);
+
+                const value = self.bus.read(effective_addr);
+                const result = self.a -% value;
+
+                self.carryBit(self.a >= value);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
+                    self.empty_cycles = 4
+                else
+                    self.empty_cycles = 3;
+            },
+            0xDE => { // DEC Absolute,X
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const base_addr = (@as(u16, high) << 8) | low;
+                const effective_addr = base_addr +% @as(u16, self.x);
+
+                const value = self.bus.read(effective_addr);
+                const result = value -% 1;
+
+                self.bus.write(effective_addr, result);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                self.empty_cycles = 6;
+            },
             0xE1 => { // SBC (Indirect,X)
                 const zp_addr = self.bus.read(self.pc);
                 self.pcIncrement(1);
