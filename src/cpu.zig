@@ -141,6 +141,34 @@ pub const CPU = struct {
 
                 self.empty_cycles = 6;
             },
+            0x01 => { // ORA (Indirect,X)
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const effective_zp = (zp_addr +% self.x) & 0xFF;
+                const low = self.bus.read(effective_zp);
+                const high = self.bus.read((effective_zp +% 1) & 0xFF);
+                const effective_addr = (@as(u16, high) << 8) | low;
+
+                const value = self.bus.read(effective_addr);
+                self.a |= value;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                self.empty_cycles = 5;
+            },
+            0x05 => { // ORA Zero Page
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const value = self.bus.read(zp_addr);
+                self.a |= value;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                self.empty_cycles = 2;
+            },
             0x06 => { // ASL Zero Page
                 const zp_addr_u8 = self.bus.read(self.pc);
                 self.pcIncrement(1);
@@ -157,6 +185,24 @@ pub const CPU = struct {
 
                 self.empty_cycles = 4;
             },
+            0x08 => { // PHP - Push Processor Status
+                const status_with_b = self.status | 0x10; // Set Break flag (bit 4)
+                self.bus.write(0x0100 + @as(u16, self.sp), status_with_b);
+                self.sp -%= 1;
+
+                self.empty_cycles = 2;
+            },
+            0x09 => { // ORA Immediate
+                const value = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                self.a |= value;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                self.empty_cycles = 1;
+            },
             0x0A => { // ASL (Arithmetic Shift Left)
                 const carry = (self.a & 0x80) != 0;
                 self.a = self.a << 1;
@@ -166,6 +212,39 @@ pub const CPU = struct {
                 self.negativeBit((self.a & 0x80) != 0);
 
                 self.empty_cycles = 1;
+            },
+            0x0D => { // ORA Absolute
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const addr = (@as(u16, high) << 8) | low;
+                const value = self.bus.read(addr);
+                self.a |= value;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                self.empty_cycles = 3;
+            },
+            0x0E => { // ASL Absolute
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const addr = (@as(u16, high) << 8) | low;
+                const value = self.bus.read(addr);
+                const carry_out = (value & 0x80) != 0;
+                const result = value << 1;
+                self.bus.write(addr, result);
+
+                self.carryBit(carry_out);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                self.empty_cycles = 5;
             },
             0x10 => { // BPL
                 const offset: i8 = @bitCast(self.bus.read(self.pc));
