@@ -1296,6 +1296,19 @@ pub const CPU = struct {
 
                 self.empty_cycles = 6;
             },
+            0x81 => { // STA (Indirect,X)
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const effective_zp = (zp_addr +% self.x) & 0xFF;
+                const low = self.bus.read(effective_zp);
+                const high = self.bus.read((effective_zp +% 1) & 0xFF);
+                const effective_addr = (@as(u16, high) << 8) | low;
+
+                self.bus.write(effective_addr, self.a);
+
+                self.empty_cycles = 5;
+            },
             0x84 => { // STY (Store Index Register Y In Memory)
                 const addr = self.bus.read(self.pc);
 
@@ -1311,6 +1324,63 @@ pub const CPU = struct {
                 self.bus.write(addr, self.a);
 
                 self.empty_cycles = 2;
+            },
+            0x86 => { // STX Zero Page
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                self.bus.write(zp_addr, self.x);
+
+                self.empty_cycles = 2;
+            },
+            0x88 => { // DEY - Decrement Y
+                self.y -%= 1;
+
+                self.zeroBit(self.y == 0);
+                self.negativeBit((self.y & 0x80) != 0);
+
+                self.empty_cycles = 1;
+            },
+            0x8A => { // TXA - Transfer X to Accumulator
+                self.a = self.x;
+
+                self.zeroBit(self.a == 0);
+                self.negativeBit((self.a & 0x80) != 0);
+
+                self.empty_cycles = 1;
+            },
+            0x8C => { // STY Absolute
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const addr = (@as(u16, high) << 8) | low;
+                self.bus.write(addr, self.y);
+
+                self.empty_cycles = 3;
+            },
+            0x8D => { // STA Absolute
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const addr = (@as(u16, high) << 8) | low;
+                self.bus.write(addr, self.a);
+
+                self.empty_cycles = 3;
+            },
+            0x8E => { // STX Absolute
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const addr = (@as(u16, high) << 8) | low;
+                self.bus.write(addr, self.x);
+
+                self.empty_cycles = 3;
             },
             0x90 => { // BCC - Branch if Carry Clear
                 const offset: i8 = @bitCast(self.bus.read(self.pc));
