@@ -57,7 +57,7 @@ pub const CPU = struct {
 
     pub fn readInstruction(self: *Self) void {
         self.opcode = self.bus.read(self.pc);
-        self.pcIncrement(1);    // Increment PC
+        self.pcIncrement(1);
         // std.debug.print("C:{d:0>4} PC:0x{X:0>4} OP1:0x{X}\n", .{self.cycles, self.pc, self.opcode});
     }
 
@@ -115,25 +115,20 @@ pub const CPU = struct {
             0x0 => {
                 // Skip the padding byte (PC += 1 beyond the opcode)
                 self.pcIncrement(1);
-
                 // Push PC high byte to stack
                 const pc_high: u8 = @intCast((self.pc >> 8) & 0xFF);
                 self.bus.write(0x0100 + @as(u16, self.sp), pc_high);
                 self.sp -%= 1; // Decrement SP with wrapping
-
                 // Push PC low byte to stack
                 const pc_low: u8 = @intCast(self.pc & 0xFF);
                 self.bus.write(0x0100 + @as(u16, self.sp), pc_low);
                 self.sp -%= 1;
-
                 // Push status register with B flag set (bit 4)
                 const status_with_b = self.status | 0b00010000;
                 self.bus.write(0x0100 + @as(u16, self.sp), status_with_b);
                 self.sp -%= 1;
-
                 // Set the I flag (bit 2)
                 self.status |= 0b00000100;
-
                 // Jump to IRQ vector at $FFFE-$FFFF
                 const irq_low = self.bus.read(0xFFFE);
                 const irq_high = self.bus.read(0xFFFF);
@@ -179,9 +174,9 @@ pub const CPU = struct {
                 const result = value << 1;
                 self.bus.write(zp_addr, result);
 
-                self.carryBit(carry_out);              // Carry flag = original bit 7
-                self.zeroBit(result == 0);             // Zero flag = true if result is 0
-                self.negativeBit((result & 0x80) != 0); // Negative flag = bit 7 of result
+                self.carryBit(carry_out);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
 
                 self.empty_cycles = 4;
             },
@@ -269,7 +264,7 @@ pub const CPU = struct {
                 self.pcIncrement(1);
 
                 const low = self.bus.read(zp_addr);
-                const high = self.bus.read((zp_addr +% 1) & 0xFF); // Wrap within zero page
+                const high = self.bus.read((zp_addr +% 1) & 0xFF);
                 const base_addr = (@as(u16, high) << 8) | low;
                 const effective_addr = base_addr +% @as(u16, self.y);
 
@@ -451,7 +446,7 @@ pub const CPU = struct {
                 const value = self.bus.read(zp_addr);
                 const carry_in = (self.status & 0x01) != 0;
                 const carry_out = (value & 0x80) != 0;
-                const carry_bit: u8 = if (carry_in) 1 else 0; // Explicitly u8
+                const carry_bit: u8 = if (carry_in) 1 else 0;
                 const result = (value << 1) | carry_bit;
 
                 self.bus.write(zp_addr, result);
@@ -534,7 +529,7 @@ pub const CPU = struct {
                 self.carryBit(true);
             },
             0x40 => { // RTI - Return from Interrupt
-                self.sp +%= 1; // Increment SP (wraps around)
+                self.sp +%= 1;
                 self.status = self.bus.read(0x0100 + @as(u16, self.sp));
 
                 self.sp +%= 1;
@@ -577,10 +572,7 @@ pub const CPU = struct {
 
                 if ((self.status & 0x40) == 0) { // Overflow flag (bit 6) clear
                     const wide: i32 = self.pc;
-
-                    // handle wrapping
-                    self.pc = @intCast(wide + offset);
-                    // self.pc = self.pc +% @as(i16, offset); // Wrapping addition
+                    self.pc +%= @intCast(wide + offset);
 
                     // Check page boundary crossing
                     if ((wide & 0xFF00) != (self.pc & 0xFF00)) {
@@ -618,8 +610,8 @@ pub const CPU = struct {
                 const indirect_addr = (@as(u16, addr_high) << 8) | addr_low;
 
                 // Emulate the bug by splitting into page and offset
-                const page = indirect_addr & 0xFF00;      // High byte of the page
-                const offset = indirect_addr & 0x00FF;    // Low byte (offset within page)
+                const page = indirect_addr & 0xFF00;
+                const offset = indirect_addr & 0x00FF;
 
                 // Read the target address with bug emulation
                 // TODO: Should we read from bus or cartage (offset) ?
@@ -638,20 +630,16 @@ pub const CPU = struct {
 
                 if ((self.status & 0x40) != 0) { // Overflow flag (bit 6) set
                     const wide: i32 = self.pc;
-
-                    // handle wrapping
-                    self.pc = @intCast(wide + offset);
-                    // const old_pc = self.pc;
-                    // self.pc = self.pc +% @bitCast(u16, @as(i16, offset)); // Wrapping addition
+                    self.pc +%= @intCast(wide + offset);
 
                     // Check page boundary crossing
                     if ((wide & 0xFF00) != (self.pc & 0xFF00)) {
-                        self.empty_cycles = 3; // 4 cycles total
+                        self.empty_cycles = 3;
                     } else {
-                        self.empty_cycles = 2; // 3 cycles total
+                        self.empty_cycles = 2;
                     }
                 } else {
-                    self.empty_cycles = 1; // 2 cycles total
+                    self.empty_cycles = 1;
                 }
             },
             0x78 => { // SEI
@@ -659,7 +647,7 @@ pub const CPU = struct {
                 self.empty_cycles = 1;
             },
             0x84 => { // STY (Store Index Register Y In Memory) TODO: CONFIRM
-                const addr = self.bus.read(self.pc); // Zero-page address
+                const addr = self.bus.read(self.pc);
 
                 self.pcIncrement(1);
                 self.bus.write(addr, self.y);
@@ -680,10 +668,7 @@ pub const CPU = struct {
 
                 if ((self.status & 0x01) == 0) { // Carry flag clear
                     const wide: i32 = self.pc;
-
-                    // TODO: handle wrapping
-                    self.pc = @intCast(wide + offset);
-                    // self.pc = self.pc +% @bitCast(u16, @as(i16, offset));
+                    self.pc +%= @intCast(wide + offset);
 
                     if ((wide & 0xFF00) != (self.pc & 0xFF00)) {
                         self.empty_cycles = 3;
@@ -714,7 +699,6 @@ pub const CPU = struct {
             },
             0x9A => { // TXS - Transfer X to Stack Pointer
                 self.sp = self.x;
-
                 self.empty_cycles = 1;
             },
             0xA0 => { // LDY Immediate
@@ -817,7 +801,7 @@ pub const CPU = struct {
                 const operand = self.bus.read(self.pc);
                 self.pcIncrement(1);
 
-                const result = self.y -% operand; // Wrapping subtraction
+                const result = self.y -% operand;
 
                 self.carryBit(self.y >= operand);
                 self.zeroBit(result == 0);
@@ -826,7 +810,7 @@ pub const CPU = struct {
                 self.empty_cycles = 1;
             },
             0xC6 => { // DEC Zero Page (replacing 0x44)
-                const addr = self.bus.read(self.pc); // Zero-page address
+                const addr = self.bus.read(self.pc);
                 self.pcIncrement(1);
 
                 const value = self.bus.read(addr);
@@ -839,8 +823,7 @@ pub const CPU = struct {
                 self.empty_cycles = 4;
             },
             0xCA => { // DEX (Decremetn X)
-                self.x -%= 1; // Wrapping subtraction
-
+                self.x -%= 1;
                 self.zeroBit(self.x == 0);
                 self.negativeBit((self.x & 0x80) != 0);
 
@@ -854,8 +837,7 @@ pub const CPU = struct {
                 // Check if zero flag is clear (bit 1 of status is 0)
                 if ((self.status & 0x02) == 0) {
                     const wide: i32 = self.pc;
-                    // Add offset to PC with 16-bit wrapping
-                    self.pc = @intCast(wide + offset);
+                    self.pc +%= @intCast(wide + offset);
 
                     // Check if page boundary is crossed
                     if ((wide & 0xFF00) != (self.pc & 0xFF00)) {
@@ -901,7 +883,6 @@ pub const CPU = struct {
                     self.status &= ~@as(u8, 0x40); // Clear overflow flag
                 }
 
-                // 2 cycles total (opcode + 1 additional)
                 self.empty_cycles = 1;
             },
             0xEA => {
@@ -913,8 +894,7 @@ pub const CPU = struct {
 
                 if ((self.status & 0x02) != 0) { // Zero flag set
                     const wide: i32 = self.pc;
-                    // TODO : Fix wrapping
-                    self.pc = @intCast(wide + offset);
+                    self.pc +%= @intCast(wide + offset);
 
                     if ((wide & 0xFF00) != (self.pc & 0xFF00)) {
                         self.empty_cycles = 3;
@@ -1087,31 +1067,11 @@ pub const CPU = struct {
     }
 
     pub fn pcIncrement(self: *Self, p: u16) void {
-        var pc: u32 = @intCast(self.pc);
-
-        const pp: u32 = @intCast(p);
-        const max_pc: u32 = 0xFFFF;
-
-        if ((pc + p) <= 0xFFFF) {
-            self.pc = self.pc + p;
-        } else {
-            pc = (pc + pp) % max_pc;
-            self.pc = @intCast(pc);
-        }
+        self.pc +%= p;
     }
 
     pub fn cycleIncrement(self: *Self, c: u16) void {
-        var cycles: u32 = @intCast(self.cycles);
-
-        const cc: u32 = @intCast(c);
-        const max_cycles: u32 = 0xFFFFFFFF;
-
-        if ((cycles + c) <= 0xFFFFFFFF) {
-            self.cycles = self.cycles + c;
-        } else {
-            cycles = (cycles + cc) % max_cycles;
-            self.cycles = @intCast(cycles);
-        }
+        self.cycles +%= c;
     }
 
 };

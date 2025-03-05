@@ -40,6 +40,7 @@ pub fn main() !void {
     // std.debug.print("|{}|\n", .{a});
     while (true) {
         cpu.cycle();
+        pia.cycle();
         std.time.sleep(100*100*100);
         // std.time.sleep(100*1000*1000);
     }

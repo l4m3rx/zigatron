@@ -2,6 +2,7 @@ const std = @import("std");
 
 pub const PIA = struct {
     allocator: std.mem.Allocator,
+    cycles: u16,
     tim1t: u8,
     tim8t: u8,
     tim64t: u8,
@@ -14,6 +15,7 @@ pub const PIA = struct {
         return PIA{
             .allocator = allocator,
             .pram = pram,
+            .cycles = 0,
             .tim1t = 0,
             .tim8t = 0,
             .tim64t = 0,
@@ -38,5 +40,17 @@ pub const PIA = struct {
     pub fn write(self: *PIA, address: u16, value: u8) void {
         std.debug.print("Writing to PIA RAM address: 0x{X}={d}\n", .{ address, value });
         self.pram[address] = value;
+    }
+
+    pub fn cycle(self: *PIA) void {
+        self.cycles +%= 1;
+
+        // Timers
+        self.tim1t -%= 1;
+        if ((self.cycles % 8) == 0) self.tim8t -%= 1;
+        if ((self.cycles % 64) == 0) self.tim64t -%= 1;
+        if ((self.cycles % 1024) == 0) self.tim1024t -%= 1;
+        // std.debug.print("[info] TIA Timers: t1: {}, t8: {}, t64: {}, t1024: {}\n",
+        //                      .{self.tim1t, self.tim8t, self.tim64t, self.tim1024t});
     }
 };
