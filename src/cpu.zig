@@ -602,14 +602,12 @@ pub const CPU = struct {
                 // Useful for dynamic jumps (e.g., jump tables), but it has a known bug on the original 6502: if the low byte is at $xxFF (e.g., $12FF),
                 // the high byte is incorrectly fetched from $1200 instead of $1300. This quirk is present in the 6507 too.
                 //
-                // Read the 16-bit indirect address from PC+1 and PC+2
                 const addr_low = self.bus.read(self.pc);
                 self.pcIncrement(1);
                 const addr_high = self.bus.read(self.pc);
                 self.pcIncrement(1);
                 const indirect_addr = (@as(u16, addr_high) << 8) | addr_low;
 
-                // Emulate the bug by splitting into page and offset
                 const page = indirect_addr & 0xFF00;
                 const offset = indirect_addr & 0x00FF;
 
@@ -619,7 +617,6 @@ pub const CPU = struct {
                 const target_high = self.bus.read(page | ((offset + 1) & 0xFF));
                 // TODO: Wrap ?
                 // If offset = 0xFF, (offset + 1) & 0xFF = 0x00, so it reads from page start
-
                 self.pc = (@as(u16, target_high) << 8) | target_low;
 
                 self.empty_cycles = 4;
@@ -646,7 +643,7 @@ pub const CPU = struct {
                 self.status |= 0x04; // Set interrupt disable flag (bit 2)
                 self.empty_cycles = 1;
             },
-            0x84 => { // STY (Store Index Register Y In Memory) TODO: CONFIRM
+            0x84 => { // STY (Store Index Register Y In Memory)
                 const addr = self.bus.read(self.pc);
 
                 self.pcIncrement(1);
