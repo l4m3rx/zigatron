@@ -96,6 +96,13 @@ pub const CPU = struct {
         self.negativeBit((value & 0x80) != 0);
     }
 
+    pub fn setOverflow(self: *Self, value: u8) void {
+        if (value & 0x40 != 0)
+            self.status |= 0x40
+        else
+            self.status &= ~@as(u8, 0x40);
+    }
+
     pub fn pushStack(self: *Self, value: u8) void {
         self.bus.write(0x0100 + @as(u16, self.sp), value);
         self.sp -= 1;
@@ -243,8 +250,8 @@ pub const CPU = struct {
             0x0A => { // ASL (Arithmetic Shift Left)
                 const carry = (self.a & 0x80) != 0;
                 self.a = self.a << 1;
-                self.carryBit(carry);
 
+                self.carryBit(carry);
                 self.setZeroNegative(self.a);
 
                 self.empty_cycles = 1;
@@ -456,11 +463,7 @@ pub const CPU = struct {
                 const result = self.a & value;
 
                 self.setZeroNegative(result);
-                // TODO: overflow?
-                if (value & 0x40 != 0)
-                    self.status |= 0x40
-                else
-                    self.status &= ~@as(u8, 0x40);
+                self.setOverflow(value);
 
                 self.empty_cycles = 3;
             },
@@ -780,8 +783,7 @@ pub const CPU = struct {
                 self.a = result;
 
                 self.carryBit(@as(u16, a) + @as(u16, operand) + @as(u16, carry_val) > 0xFF);
-                self.zeroBit(result == 0);
-                self.negativeBit((result & 0x80) != 0);
+                self.setZeroNegative(result);
 
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
                 self.overflowBit(overflow);
@@ -798,8 +800,7 @@ pub const CPU = struct {
                 self.a = result;
 
                 self.carryBit(@as(u16, a) + @as(u16, operand) + @as(u16, carry_val) > 0xFF);
-                self.zeroBit(result == 0);
-                self.negativeBit((result & 0x80) != 0);
+                self.setZeroNegative(result);
 
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
                 self.overflowBit(overflow);
@@ -815,18 +816,16 @@ pub const CPU = struct {
                 const result = (value >> 1) | carry_bit;
 
                 self.bus.write(zp_addr, result);
+
                 self.carryBit(carry_out);
-                self.zeroBit(result == 0);
-                self.negativeBit((result & 0x80) != 0);
+                self.setZeroNegative(result);
 
                 self.empty_cycles = 4;
             },
             0x68 => { // PLA - Pull Accumulator
                 self.sp +%= 1;
                 self.a = self.bus.read(0x0100 + @as(u16, self.sp));
-
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
+                self.setZeroNegative(self.a);
 
                 self.empty_cycles = 3;
             },
@@ -841,8 +840,7 @@ pub const CPU = struct {
                 self.a = result;
 
                 self.carryBit(@as(u16, a) + @as(u16, operand) + @as(u16, carry_val) > 0xFF);
-                self.zeroBit(result == 0);
-                self.negativeBit((result & 0x80) != 0);
+                self.setZeroNegative(result);
 
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
                 self.overflowBit(overflow);
@@ -856,8 +854,7 @@ pub const CPU = struct {
                 self.a = (self.a >> 1) | carry_bit;
 
                 self.carryBit(carry_out);
-                self.zeroBit(self.a == 0);
-                self.negativeBit((self.a & 0x80) != 0);
+                self.setZeroNegative(self.a);
 
                 self.empty_cycles = 1;
             },
@@ -890,8 +887,7 @@ pub const CPU = struct {
                 self.a = result;
 
                 self.carryBit(@as(u16, a) + @as(u16, operand) + @as(u16, carry_val) > 0xFF);
-                self.zeroBit(result == 0);
-                self.negativeBit((result & 0x80) != 0);
+                self.setZeroNegative(result);
 
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
                 self.overflowBit(overflow);
@@ -908,8 +904,7 @@ pub const CPU = struct {
 
                 self.bus.write(addr, result);
                 self.carryBit(carry_out);
-                self.zeroBit(result == 0);
-                self.negativeBit((result & 0x80) != 0);
+                self.setZeroNegative(result);
 
                 self.empty_cycles = 5;
             },
@@ -940,8 +935,8 @@ pub const CPU = struct {
                 self.a = result;
 
                 self.carryBit(@as(u16, a) + @as(u16, operand) + @as(u16, carry_val) > 0xFF);
-                self.zeroBit(result == 0);
-                self.negativeBit((result & 0x80) != 0);
+                self.setZeroNegative(result);
+
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
                 self.overflowBit(overflow);
 
@@ -958,8 +953,8 @@ pub const CPU = struct {
                 self.a = result;
 
                 self.carryBit(@as(u16, a) + @as(u16, operand) + @as(u16, carry_val) > 0xFF);
-                self.zeroBit(result == 0);
-                self.negativeBit((result & 0x80) != 0);
+                self.setZeroNegative(result);
+
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
                 self.overflowBit(overflow);
 
@@ -976,8 +971,7 @@ pub const CPU = struct {
 
                 self.bus.write(effective_addr, result);
                 self.carryBit(carry_out);
-                self.zeroBit(result == 0);
-                self.negativeBit((result & 0x80) != 0);
+                self.setZeroNegative(result);
 
                 self.empty_cycles = 5;
             },
@@ -997,8 +991,8 @@ pub const CPU = struct {
                 self.a = result;
 
                 self.carryBit(@as(u16, a) + @as(u16, operand) + @as(u16, carry_val) > 0xFF);
-                self.zeroBit(result == 0);
-                self.negativeBit((result & 0x80) != 0);
+                self.setZeroNegative(result);
+
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
                 self.overflowBit(overflow);
 
@@ -1016,8 +1010,8 @@ pub const CPU = struct {
                 self.a = result;
 
                 self.carryBit(@as(u16, a) + @as(u16, operand) + @as(u16, carry_val) > 0xFF);
-                self.zeroBit(result == 0);
-                self.negativeBit((result & 0x80) != 0);
+                self.setZeroNegative(result);
+
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
                 self.overflowBit(overflow);
 
@@ -1036,8 +1030,7 @@ pub const CPU = struct {
                 self.bus.write(effective_addr, result);
 
                 self.carryBit(carry_out);
-                self.zeroBit(result == 0);
-                self.negativeBit((result & 0x80) != 0);
+                self.setZeroNegative(result);
 
                 self.empty_cycles = 6;
             },
