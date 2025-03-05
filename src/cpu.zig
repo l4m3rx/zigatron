@@ -1847,6 +1847,13 @@ pub const CPU = struct {
 
                 self.empty_cycles = 4;
             },
+            0xC8 => { // INY (Increment Y)
+                self.y +%= 1;
+                self.zeroBit(self.y == 0);
+                self.negativeBit((self.y & 0x80) != 0);
+
+                self.empty_cycles = 1;
+            },
             0xCA => { // DEX (Decremetn X)
                 self.x -%= 1;
                 self.zeroBit(self.x == 0);
