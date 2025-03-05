@@ -1,6 +1,7 @@
 const std = @import("std");
-const CPU = @import("cpu.zig").CPU;
 const RAM = @import("mem.zig").RAM;
+const PIA = @import("pia.zig").PIA;
+const CPU = @import("cpu.zig").CPU;
 const BUS = @import("bus.zig").BUS;
 const CAR = @import("cartridge.zig");
 
@@ -13,6 +14,9 @@ pub fn main() !void {
 
     var ram = try RAM.init(allocator, 1024);
     defer ram.deinit();
+
+    var pia = try PIA.init(allocator);
+    defer pia.deinit();
 
     var cart = try CAR.Cartridge.init(allocator, "game.bin");
     defer cart.deinit();
