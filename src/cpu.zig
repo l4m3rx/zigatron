@@ -96,6 +96,16 @@ pub const CPU = struct {
         self.negativeBit((value & 0x80) != 0);
     }
 
+    pub fn pushStack(self: *Self, value: u8) void {
+        self.bus.write(0x0100 + @as(u16, self.sp), value);
+        self.sp -= 1;
+    }
+
+    pub fn pullStack(self: *Self) u8 {
+        self.sp += 1;
+        return self.bus.read(0x0100 + @as(u16, self.sp));
+    }
+
     pub fn interruptBit(self: *Self, b: bool) void {
         if (b)
             self.status |= InterruptDisable
@@ -171,8 +181,7 @@ pub const CPU = struct {
                 self.sp -%= 1;
 
                 const status_with_b = self.status | 0b00010000;
-                self.bus.write(0x0100 + @as(u16, self.sp), status_with_b);
-                self.sp -%= 1;
+                self.pushStack(status_with_b);
                 // Set the I flag (bit 2)
                 self.status |= 0b00000100;
                 // Jump to IRQ vector at $FFFE-$FFFF
@@ -219,9 +228,7 @@ pub const CPU = struct {
             },
             0x08 => { // PHP - Push Processor Status
                 const status_with_b = self.status | 0x10; // Set Break flag (bit 4)
-                self.bus.write(0x0100 + @as(u16, self.sp), status_with_b);
-                self.sp -%= 1;
-
+                self.pushStack(status_with_b);
                 self.empty_cycles = 2;
             },
             0x09 => { // ORA Immediate
@@ -613,10 +620,7 @@ pub const CPU = struct {
                 self.empty_cycles = 4;
             },
             0x48 => { // PHA - Push Accumulator
-                // TODO Check if we need to offset the addr
-                self.bus.write(0x0100 + @as(u16, self.sp), self.a);
-                self.sp -%= 1;
-
+                self.pushStack(self.a);
                 self.empty_cycles = 2;
             },
             0x49 => { // EOR Immediate
