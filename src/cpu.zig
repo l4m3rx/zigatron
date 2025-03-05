@@ -237,8 +237,61 @@ pub const CPU = struct {
                 }
                 self.empty_cycles = 4;
             },
+            0x50 => { // BVC - Branch if Overflow Clear
+                const offset: i8 = @bitCast(self.bus.read(self.pc)); // Signed offset
+                self.pcIncrement(1);
+
+                if ((self.status & 0x40) == 0) { // Overflow flag (bit 6) clear
+                    const wide: i32 = self.pc;
+
+                    // handle wrapping
+                    self.pc = @intCast(wide + offset);
+                    // self.pc = self.pc +% @as(i16, offset); // Wrapping addition
+
+                    // Check page boundary crossing
+                    if ((wide & 0xFF00) != (self.pc & 0xFF00)) {
+                        self.empty_cycles = 3;
+                    } else {
+                        self.empty_cycles = 2;
+                    }
+                } else {
+                    self.empty_cycles = 1;
+                }
+            },
             0x58 => { // CLI (Clear Interrupt Disable)
                 self.interruptBit(false);
+            },
+            0x60 => { // RTS - Return from Subroutine
+                self.sp +%= 1;
+                const pc_low = self.bus.read(0x0100 + @as(u16, self.sp));
+                self.sp +%= 1;
+                const pc_high = self.bus.read(0x0100 + @as(u16, self.sp));
+
+                self.pc = ((@as(u16, pc_high) << 8) | pc_low) +% 1;
+
+                self.empty_cycles = 5;
+            },
+            0x70 => { // BVS - Branch if Overflow Set
+                const offset: i8 = @bitCast(self.bus.read(self.pc));
+                self.pcIncrement(1);
+
+                if ((self.status & 0x40) != 0) { // Overflow flag (bit 6) set
+                    const wide: i32 = self.pc;
+
+                    // handle wrapping
+                    self.pc = @intCast(wide + offset);
+                    // const old_pc = self.pc;
+                    // self.pc = self.pc +% @bitCast(u16, @as(i16, offset)); // Wrapping addition
+
+                    // Check page boundary crossing
+                    if ((wide & 0xFF00) != (self.pc & 0xFF00)) {
+                        self.empty_cycles = 3; // 4 cycles total
+                    } else {
+                        self.empty_cycles = 2; // 3 cycles total
+                    }
+                } else {
+                    self.empty_cycles = 1; // 2 cycles total
+                }
             },
             0x78 => { // SEI
                 self.status |= 0x04; // Set interrupt disable flag (bit 2)
