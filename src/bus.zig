@@ -1,5 +1,6 @@
 const std = @import("std");
 const RAM = @import("mem.zig").RAM;
+const PIA = @import("pia.zig").PIA;
 const CAR = @import("cartridge.zig").Cartridge;
 
 
@@ -7,17 +8,18 @@ pub const BUS = struct {
     allocator: std.mem.Allocator,
     ram: *RAM = undefined,
     car: *CAR = undefined,
+    pia: *PIA = undefined,
     bus: []u8,
 
-    pub fn init(allocator: std.mem.Allocator, ram: *RAM, car: *CAR) !BUS {
+    pub fn init(allocator: std.mem.Allocator, ram: *RAM, car: *CAR, pia: *PIA) !BUS {
         const bus = try allocator.alloc(u8, 1024);
-        const b = BUS{
+        return BUS{
             .allocator = allocator,
             .bus = bus,
             .car = car,
-            .ram = ram
+            .ram = ram,
+            .pia = pia
         };
-        return b;
     }
 
     pub fn reset(self: *BUS) void {
@@ -45,7 +47,8 @@ pub const BUS = struct {
             return self.readRam(addr)
         else if ((addr >= 0x80) and (addr <= 0xFF))
             return 0 // RIOT
-        else if ((addr >= 0x0200) and (addr <= 0x02FF))
+        else if ((addr & 1080) == 0)
+        // else if ((addr >= 0x0200) and (addr <= 0x02FF))
             return 0 // TIA (Television interface adapter)
         else if ((addr >= 0x1000) and (addr <= 0xFFFF))
             return self.readCart(addr & 0x1FFF)

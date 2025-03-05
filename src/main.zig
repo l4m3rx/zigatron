@@ -21,7 +21,7 @@ pub fn main() !void {
     var cart = try CAR.Cartridge.init(allocator, "game.bin");
     defer cart.deinit();
 
-    var bus = try BUS.init(allocator, &ram, &cart);
+    var bus = try BUS.init(allocator, &ram, &cart, &pia);
     defer bus.deinit();
 
     var cpu = try CPU.init(allocator, &bus);
