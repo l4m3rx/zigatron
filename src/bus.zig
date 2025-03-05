@@ -42,16 +42,31 @@ pub const BUS = struct {
     }
 
     pub fn read(self: *BUS, addr: u16) u8 {
-        // TODO: speed up
-        if ((addr >= 0) and (addr <= 0x007F))
-            return self.readRam(addr)
-        else if ((addr >= 0x80) and (addr <= 0xFF))
-            return 0 // RIOT
-        else if ((addr & 1080) == 0)
-        // else if ((addr >= 0x0200) and (addr <= 0x02FF))
-            return 0 // TIA (Television interface adapter)
-        else if ((addr >= 0x1000) and (addr <= 0xFFFF))
-            return self.readCart(addr & 0x1FFF)
+        const masked_addr = addr & 0x1FFF; // 6507 is limited
+
+        if (masked_addr <= 0x1F)
+            // return self.tia.read(masked);
+            return 0 // TIA
+        else if ((masked_addr >= 0x20) and (masked_addr <= 0x3F)) {
+            // var base_addr = masked_addr & 0x001F;
+            // return self.tia.read(base_addr);
+            return 0; // TIA
+        }
+        else if ((masked_addr >= 0x40) and (masked_addr <= 0x7F))
+            return self.readRam(masked_addr - 0x0040)
+        else if ((masked_addr >= 0x80) and (masked_addr <= 0x8F)) {
+            // return self.riot.read(masked_addr - 0x0080);
+            return 0; // RIOT
+        }
+        else if ((masked_addr >= 0x90) and (masked_addr <= 0x9F)) {
+            // var base_addr = masked_addr & 0x008F;
+            // return self.riot.read(base_addr - 0x0080);
+            return 0; // RIOT
+        }
+        else if ((masked_addr >= 0x100) and (masked_addr <= 0x1FF))
+            return self.readRam(masked_addr - 0x0100) // Stack
+        else if ((masked_addr >= 0x1000) and (masked_addr <= 0x1FFF))
+            return self.readCart(addr)
         else
             return 0; // bad place!
     }
