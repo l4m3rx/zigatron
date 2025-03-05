@@ -112,8 +112,34 @@ pub const CPU = struct {
 
         // TODO: make this with enums
         switch(self.opcode) {
-            0xEA => {
-                self.empty_cycles = 1;
+            0x0 => {
+                // Skip the padding byte (PC += 1 beyond the opcode)
+                self.pcIncrement(1);
+
+                // Push PC high byte to stack
+                const pc_high: u8 = @intCast((self.pc >> 8) & 0xFF);
+                self.bus.write(0x0100 + @as(u16, self.sp), pc_high);
+                self.sp -%= 1; // Decrement SP with wrapping
+
+                // Push PC low byte to stack
+                const pc_low: u8 = @intCast(self.pc & 0xFF);
+                self.bus.write(0x0100 + @as(u16, self.sp), pc_low);
+                self.sp -%= 1;
+
+                // Push status register with B flag set (bit 4)
+                const status_with_b = self.status | 0b00010000;
+                self.bus.write(0x0100 + @as(u16, self.sp), status_with_b);
+                self.sp -%= 1;
+
+                // Set the I flag (bit 2)
+                self.status |= 0b00000100;
+
+                // Jump to IRQ vector at $FFFE-$FFFF
+                const irq_low = self.bus.read(0xFFFE);
+                const irq_high = self.bus.read(0xFFFF);
+                self.pc = (@as(u16, irq_high) << 8) | irq_low;
+
+                self.empty_cycles = 6;
             },
             0x06 => { // ASL Zero Page
                 const zp_addr_u8 = self.bus.read(self.pc);
@@ -184,6 +210,19 @@ pub const CPU = struct {
             },
             0x38 => { // SEC (Set Carry)
                 self.carryBit(true);
+            },
+            0x40 => { // RTI - Return from Interrupt
+                self.sp +%= 1; // Increment SP (wraps around)
+                self.status = self.bus.read(0x0100 + @as(u16, self.sp));
+
+                self.sp +%= 1;
+                const pc_low = self.bus.read(0x0100 + @as(u16, self.sp));
+                self.sp +%= 1;
+                const pc_high = self.bus.read(0x0100 + @as(u16, self.sp));
+
+                self.pc = (@as(u16, pc_high) << 8) | pc_low;
+
+                self.empty_cycles = 5;
             },
             0x44 => { // DEC (Decrement memory)
                 self.readInstruction();
@@ -461,6 +500,9 @@ pub const CPU = struct {
                 // 2 cycles total (opcode + 1 additional)
                 self.empty_cycles = 1;
             },
+            0xEA => {
+                self.empty_cycles = 1;
+            },
             0xF6 => { // INC Zero Page, X
                 const zp_addr = self.bus.read(self.pc);
                 self.pcIncrement(1);
@@ -475,35 +517,6 @@ pub const CPU = struct {
                 self.negativeBit((new_value & 0x80) != 0);
 
                 self.empty_cycles = 5;
-            },
-            0x0 => {
-                // Skip the padding byte (PC += 1 beyond the opcode)
-                self.pcIncrement(1);
-
-                // Push PC high byte to stack
-                const pc_high: u8 = @intCast((self.pc >> 8) & 0xFF);
-                self.bus.write(0x0100 + @as(u16, self.sp), pc_high);
-                self.sp -%= 1; // Decrement SP with wrapping
-
-                // Push PC low byte to stack
-                const pc_low: u8 = @intCast(self.pc & 0xFF);
-                self.bus.write(0x0100 + @as(u16, self.sp), pc_low);
-                self.sp -%= 1;
-
-                // Push status register with B flag set (bit 4)
-                const status_with_b = self.status | 0b00010000;
-                self.bus.write(0x0100 + @as(u16, self.sp), status_with_b);
-                self.sp -%= 1;
-
-                // Set the I flag (bit 2)
-                self.status |= 0b00000100;
-
-                // Jump to IRQ vector at $FFFE-$FFFF
-                const irq_low = self.bus.read(0xFFFE);
-                const irq_high = self.bus.read(0xFFFF);
-                self.pc = (@as(u16, irq_high) << 8) | irq_low;
-
-                self.empty_cycles = 6;
             },
             else => {
                 std.debug.print("[warn] Unimplemented instruction 0x{X}\n", .{self.opcode});
