@@ -1790,6 +1790,50 @@ pub const CPU = struct {
 
                 self.empty_cycles = 1;
             },
+            0xC1 => { // CMP (Indirect,X)
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const effective_zp = (zp_addr +% self.x) & 0xFF;
+                const low = self.bus.read(effective_zp);
+                const high = self.bus.read((effective_zp +% 1) & 0xFF);
+                const effective_addr = (@as(u16, high) << 8) | low;
+
+                const value = self.bus.read(effective_addr);
+                const result = self.a -% value;
+
+                self.carryBit(self.a >= value);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                self.empty_cycles = 5;
+            },
+            0xC4 => { // CPY Zero Page
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const value = self.bus.read(zp_addr);
+                const result = self.y -% value;
+
+                self.carryBit(self.y >= value);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                self.empty_cycles = 2;
+            },
+            0xC5 => { // CMP Zero Page
+                const zp_addr = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const value = self.bus.read(zp_addr);
+                const result = self.a -% value;
+
+                self.carryBit(self.a >= value);
+                self.zeroBit(result == 0);
+                self.negativeBit((result & 0x80) != 0);
+
+                self.empty_cycles = 2;
+            },
             0xC6 => { // DEC Zero Page (replacing 0x44)
                 const addr = self.bus.read(self.pc);
                 self.pcIncrement(1);
