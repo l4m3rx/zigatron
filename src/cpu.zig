@@ -1951,6 +1951,22 @@ pub const CPU = struct {
             0xEA => {
                 self.empty_cycles = 1;
             },
+            0xEE => { // INC Absolute
+                const low = self.bus.read(self.pc);
+                self.pcIncrement(1);
+                const high = self.bus.read(self.pc);
+                self.pcIncrement(1);
+
+                const addr = (@as(u16, high) << 8) | low;
+                const value = self.bus.read(addr);
+                const new_value = value +% 1;
+                self.bus.write(addr , new_value);
+
+                self.zeroBit(new_value == 0);
+                self.negativeBit((new_value & 0x80) != 0);
+
+                self.empty_cycles = 6;
+            },
             0xF0 => { // BEQ - Branch if Equal
                 const offset: i8 = @bitCast(self.bus.read(self.pc));
                 self.pcIncrement(1);
