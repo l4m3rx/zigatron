@@ -628,7 +628,7 @@ pub const CPU = struct {
                 self.setZeroNegative(self.a);
                 self.empty_cycles = 1;
             },
-            0x4A => { // LSR Accumulator
+           0x4A => { // LSR Accumulator
                 const carry_out = (self.a & 0x01) != 0;
                 self.a >>= 1;
 
