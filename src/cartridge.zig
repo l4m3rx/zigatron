@@ -110,9 +110,9 @@ pub const Cartridge = struct {
 
     // Basic cartridge info
     pub fn printInfo(self: Self) void {
-        std.debug.print("[info] Cartridge size: {} bytes\n", .{self.size});
-        std.debug.print("[info] NMI Vector: 0x{X:0>4}\n", .{self.nmi});
-        std.debug.print("[info] Reset Vector: 0x{X:0>4}\n", .{self.reset});
-        std.debug.print("[info] Entry Point: 0x{X:0>4}\n", .{self.entry});
+        std.debug.print("[I] Cartridge size: {} bytes\n", .{self.size});
+        std.debug.print("[I] NMI Vector: 0x{X:0>4}\n", .{self.nmi});
+        std.debug.print("[I] Reset Vector: 0x{X:0>4}\n", .{self.reset});
+        std.debug.print("[I] Entry Point: 0x{X:0>4}\n", .{self.entry});
     }
 };
