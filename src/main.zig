@@ -14,8 +14,9 @@ pub fn main() !void {
     var riot = try RIOT.init(allocator);
     defer riot.deinit();
 
-    var cart = try CAR.Cartridge.init(allocator, "game.bin");
+    var cart = try CAR.Cartridge.init(allocator);
     defer cart.deinit();
+    try cart.load("game.bin");
 
     var bus = try BUS.init(allocator, &cart, &riot);
     defer bus.deinit();
@@ -27,9 +28,7 @@ pub fn main() !void {
     // cart.dumpRom(cart.size);
 
     bus.reset();
-
-    if (cart.getEntryPoint()) |entrypoint|
-        cpu.reset(entrypoint);
+    cpu.reset(cart.entry);
 
     // const a = bus.readCart(0x8040);
     // std.debug.print("|{}|\n", .{a});

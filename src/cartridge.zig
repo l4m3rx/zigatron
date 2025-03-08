@@ -2,24 +2,16 @@ const std = @import("std");
 
 pub const Cartridge = struct {
     allocator: std.mem.Allocator,
-    rom: []u8,
-    size: usize,
+    rom: []u8 = undefined,
+    size: usize = 0,
+    nmi: u16 = 0,
+    reset: u16 = 0,
+    entry: u16 = 0,
 
     const Self = @This();
 
-    pub fn init(allocator: std.mem.Allocator, file_path: []const u8) !Cartridge {
-        const file = try std.fs.cwd().openFile(file_path, .{});
-        defer file.close();
-        // Validate size
-        const file_size = try file.getEndPos();
-        if (file_size < 2048 or file_size > 65536)
-            std.debug.print("[warn] Unusual cartridge size: {} bytes. (Expected 2KB-64KB)\n", .{file_size});
-        // Read the ROM data
-        const rom = try file.readToEndAlloc(allocator, file_size);
-
+    pub fn init(allocator: std.mem.Allocator) !Cartridge {
         return Cartridge{
-            .rom = rom,
-            .size = file_size,
             .allocator = allocator,
         };
     }
@@ -27,6 +19,28 @@ pub const Cartridge = struct {
     // Deinitialize the cartridge and free memory
     pub fn deinit(self: *Cartridge) void {
         self.allocator.free(self.rom);
+    }
+
+    // Load cartrage
+    pub fn load(self: *Cartridge, filePath: []const u8) !void {
+        const file = try std.fs.cwd().openFile(filePath, .{});
+        defer file.close();
+
+        // Validate size
+        self.size = try file.getEndPos();
+        if (self.size < 2048 or self.size > 65536)
+            std.debug.print("[warn] Unusual cartridge size: {} bytes. (Expected 2KB-64KB)\n", .{self.size});
+
+        // Read the ROM data
+        self.rom = try file.readToEndAlloc(self.allocator, self.size);
+
+        // Set NMI Vector, Reset Vector, Entry Point
+        if (self.getNmiVector()) |nmi|
+            self.nmi = nmi;
+        if (self.getResetVector()) |reset|
+            self.reset = reset;
+        if (self.getEntryPoint()) |entry|
+            self.entry = entry;
     }
 
     // Read from ROM
@@ -41,6 +55,7 @@ pub const Cartridge = struct {
     }
 
     // Write to ROM (ram?)
+    // TODO: Add address limit
     pub fn write(self: *Cartridge, addr: u16, data: u8) void {
         self.rom[addr] = data;
     }
@@ -75,8 +90,8 @@ pub const Cartridge = struct {
             if (vector >= 0x1000 and vector <= 0x1FFF) {
                 return vector;
             } else {
-                std.debug.print("[I] Reset vector (0x{x:0>4}) outside expected range (0x1000-0x1FFF)\n", .{vector});
-                std.debug.print("[I] Using Vector 0x{X}", .{vector + 0x1000});
+                std.debug.print("[I] Reset vector (0x{X:0>4}) outside expected range (0x1000-0x1FFF)\n", .{vector});
+                std.debug.print("[I] Using Vector 0x{X}\n", .{vector + 0x1000});
                 return vector + 0x1000;
             }
         }
@@ -87,8 +102,8 @@ pub const Cartridge = struct {
     pub fn dumpRom(self: Self, limit: usize) void {
         const max = @min(limit, self.size);
         for (self.rom[0..max], 0..) |byte, i| {
-            if (i % 16 == 0) std.debug.print("\n{x:0>4}: ", .{i});
-            std.debug.print("{x:0>2} ", .{byte});
+            if (i % 16 == 0) std.debug.print("\n{X:0>4}: ", .{i});
+            std.debug.print("{X:0>2} ", .{byte});
         }
         std.debug.print("\n", .{});
     }
@@ -96,12 +111,8 @@ pub const Cartridge = struct {
     // Basic cartridge info
     pub fn printInfo(self: Self) void {
         std.debug.print("[info] Cartridge size: {} bytes\n", .{self.size});
-
-        if (self.getNmiVector()) |nmi|
-            std.debug.print("[info] NMI Vector: 0x{x:0>4}\n", .{nmi});
-        if (self.getResetVector()) |reset|
-            std.debug.print("[info] Reset Vector: 0x{x:0>4}\n", .{reset});
-        if (self.getEntryPoint()) |entry|
-            std.debug.print("[info] Entry Point: 0x{x:0>4}\n", .{entry});
+        std.debug.print("[info] NMI Vector: 0x{X:0>4}\n", .{self.nmi});
+        std.debug.print("[info] Reset Vector: 0x{X:0>4}\n", .{self.reset});
+        std.debug.print("[info] Entry Point: 0x{X:0>4}\n", .{self.entry});
     }
 };
