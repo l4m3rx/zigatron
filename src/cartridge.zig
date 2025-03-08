@@ -90,7 +90,8 @@ pub const Cartridge = struct {
             if (vector >= 0x1000 and vector <= 0x1FFF) {
                 return vector;
             } else {
-                std.debug.print("[I] Cartrage Reset vector 0x{X:0>4} is out of range 0x1000-0x1FFF. Setting value 0x{X}\n", .{vector, vector + 0x1000});
+                std.debug.print("[I] Cartrage:\n\tReset Vector   0x{X:0>4}\n", .{vector});
+                std.debug.print("\tExpected range 0x1000-0x1FFF\n\tSetting value  0x{X}\n", .{vector + 0x1000});
                 return vector + 0x1000;
             }
         }
@@ -110,9 +111,9 @@ pub const Cartridge = struct {
     // Basic cartridge info
     pub fn printInfo(self: Self) void {
         std.debug.print("[I] Cartridge:\n", .{});
-        std.debug.print("\tSize: {} bytes\n", .{self.size});
-        std.debug.print("\tNMI Vector: 0x{X:0>4}\n", .{self.nmi});
+        std.debug.print("\tSize:         {} bytes\n", .{self.size});
+        std.debug.print("\tNMI Vector:   0x{X:0>4}\n", .{self.nmi});
         std.debug.print("\tReset Vector: 0x{X:0>4}\n", .{self.reset});
-        std.debug.print("\tEntry Point: 0x{X:0>4}\n", .{self.entry});
+        std.debug.print("\tEntry Point:  0x{X:0>4}\n", .{self.entry});
     }
 };
