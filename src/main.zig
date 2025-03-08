@@ -24,7 +24,7 @@ pub fn main() !void {
     // defer cpu.deinit();
 
     cart.printInfo();
-    cart.dumpRom(cart.size);
+    // cart.dumpRom(cart.size);
 
     bus.reset();
 

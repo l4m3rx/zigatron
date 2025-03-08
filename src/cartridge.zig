@@ -75,8 +75,9 @@ pub const Cartridge = struct {
             if (vector >= 0x1000 and vector <= 0x1FFF) {
                 return vector;
             } else {
-                std.debug.print("[warn] Reset vector (0x{x:0>4}) outside expected range (0x1000-0x1FFF)\n", .{vector});
-                return vector;
+                std.debug.print("[I] Reset vector (0x{x:0>4}) outside expected range (0x1000-0x1FFF)\n", .{vector});
+                std.debug.print("[I] Using Vector 0x{X}", .{vector + 0x1000});
+                return vector + 0x1000;
             }
         }
         return null;

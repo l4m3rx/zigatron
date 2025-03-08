@@ -59,7 +59,6 @@ pub const CPU = struct {
 
     pub fn readInstruction(self: *Self) void {
         self.opcode = self.bus.read(self.pc);
-        std.debug.print("   OP: 0x{X} PC:0x{X}\n", .{self.opcode, self.pc});
         self.pcIncrement(1);
     }
 
