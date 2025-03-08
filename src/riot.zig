@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub const PIA = struct {
+pub const RIOT = struct {
     allocator: std.mem.Allocator,
     cycles: u16,
     tim1t: u8,
@@ -9,10 +9,10 @@ pub const PIA = struct {
     tim1024t: u8,
     pram: []u8,
 
-    pub fn init(allocator: std.mem.Allocator) !PIA {
+    pub fn init(allocator: std.mem.Allocator) !RIOT {
         const pram = try allocator.alloc(u8, 128);
 
-        return PIA{
+        return RIOT{
             .allocator = allocator,
             .pram = pram,
             .cycles = 0,
@@ -23,26 +23,36 @@ pub const PIA = struct {
         };
     }
 
-    pub fn deinit(self: *PIA) void {
+    pub fn deinit(self: *RIOT) void {
         self.allocator.free(self.pram);
     }
 
-    pub fn read(self: *PIA, address: u16) u8 {
-        if ((address >= 0x0) and (address <= 0xFF)) {
-            std.debug.print("[info] PIA RAM Reading address: 0x{X}\n", .{ address });
-            return self.pram[address];
-        } else {
-            std.debug.print("[error] PIA RAM Address out of range 0x{X}\n", .{ address });
+    pub fn readRam(self: *RIOT, address: u16) u8 {
+        // std.debug.print("[I] RIOT Reading: 0x{X}\n", .{ address });
+        if (address >= 0x80) {
+            std.debug.print("[E] RAM Read Address out of range 0x{X}\n", .{address});
             return 0;
         }
+        return self.pram[address];
     }
 
-    pub fn write(self: *PIA, address: u16, value: u8) void {
-        std.debug.print("Writing to PIA RAM address: 0x{X}={d}\n", .{ address, value });
+    pub fn writeRam(self: *RIOT, address: u16, data: u8) void {
+        // std.debug.print("[I] RIOT Reading: 0x{X}\n", .{ address });
+        if (address < 0x80)
+            self.pram[address] = data;
+    }
+
+    pub fn read(self: *RIOT, address: u16) u8 {
+        std.debug.print("[I] RIOT Reading: 0x{X}\n", .{ address });
+        return self.pram[address];
+    }
+
+    pub fn write(self: *RIOT, address: u16, value: u8) void {
+        std.debug.print("[I] RIOT Writing: 0x{X}={d}\n", .{ address, value });
         self.pram[address] = value;
     }
 
-    pub fn cycle(self: *PIA) void {
+    pub fn cycle(self: *RIOT) void {
         self.cycles +%= 1;
 
         // Timers

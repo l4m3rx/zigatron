@@ -1,24 +1,21 @@
 const std = @import("std");
-const RAM = @import("mem.zig").RAM;
-const PIA = @import("pia.zig").PIA;
 const CAR = @import("cartridge.zig").Cartridge;
+const RIOT = @import("riot.zig").RIOT;
 
 
 pub const BUS = struct {
     allocator: std.mem.Allocator,
-    ram: *RAM = undefined,
     car: *CAR = undefined,
-    pia: *PIA = undefined,
+    riot: *RIOT = undefined,
     bus: []u8,
 
-    pub fn init(allocator: std.mem.Allocator, ram: *RAM, car: *CAR, pia: *PIA) !BUS {
+    pub fn init(allocator: std.mem.Allocator, car: *CAR, riot: *RIOT) !BUS {
         const bus = try allocator.alloc(u8, 1024);
         return BUS{
             .allocator = allocator,
             .bus = bus,
             .car = car,
-            .ram = ram,
-            .pia = pia
+            .riot = riot
         };
     }
 
@@ -31,57 +28,57 @@ pub const BUS = struct {
         self.allocator.free(self.bus);
     }
 
-    pub fn readRam(self: *BUS, addr: u16) u8 {
-        // std.debug.print("Read RAM address: 0x{X:0>4}\n", .{addr});
-        return self.car.read(addr);
+    pub fn readStack(self: *BUS, addr: u16) u8 {
+        // std.debug.print("[I] Stack pull \n", .{});
+        return self.bus[addr];
     }
 
-    pub fn readCart(self: *BUS, addr: u16) u8 {
-        // std.debug.print("Read bus address: 0x{X:0>4}\n", .{addr});
-        return self.car.read(addr);
+    pub fn writeStack(self: *BUS, addr: u16, data: u8) void {
+        // std.debug.print("[I] Stack push {}\n", .{value});
+        self.bus[addr] = data;
     }
 
     pub fn read(self: *BUS, addr: u16) u8 {
-        const masked_addr = addr & 0x1FFF; // 6507 is limited
+        // Extract Relevent Address bits
+        const a7  = (addr & 0b0000_0000_1000_0000) != 0;
+        const a9  = (addr & 0b0000_0010_0000_0000) != 0;
+        const a12 = (addr & 0b0001_0000_0000_0000) != 0;
 
-        if (masked_addr <= 0x1F)
-            // return self.tia.read(masked);
-            return 0 // TIA
-        else if ((masked_addr >= 0x20) and (masked_addr <= 0x3F)) {
-            // var base_addr = masked_addr & 0x001F;
-            // return self.tia.read(base_addr);
-            return 0; // TIA
+        if (a12) { // Cartrage memory is selected by A12=1
+            return self.car.read(addr & 0x0FFF);
+        } else if (a7 and a9) { // RIOT I/O is selected by A12=0, A9=1, A7=1
+            std.debug.print("RIOT 0x{X}-0x{X}\n", .{addr, addr & 0x02FF});
+            return self.riot.read(addr & 0x02FF);
+        } else if ((!a9) and a7) { // RAM is selected by A12=0, A9=0, A7=1
+            std.debug.print("RAM 0x{X}-0x{X}\n", .{addr, addr & 0x7F});
+            return self.riot.readRam(addr & 0x7F);
+        } else { // The TIA chip is addressed by A12=0, A7=0
+            return 0;
+            // return self.tia.read((addr & 0x0F) | 0x30);
         }
-        else if ((masked_addr >= 0x40) and (masked_addr <= 0x7F))
-            return self.readRam(masked_addr - 0x0040)
-        else if ((masked_addr >= 0x80) and (masked_addr <= 0x8F)) {
-            // return self.riot.read(masked_addr - 0x0080);
-            return 0; // RIOT
-        }
-        else if ((masked_addr >= 0x90) and (masked_addr <= 0x9F)) {
-            // var base_addr = masked_addr & 0x008F;
-            // return self.riot.read(base_addr - 0x0080);
-            return 0; // RIOT
-        }
-        else if ((masked_addr >= 0x100) and (masked_addr <= 0x1FF))
-            return self.readRam(masked_addr - 0x0100) // Stack
-        else if ((masked_addr >= 0x1000) and (masked_addr <= 0x1FFF))
-            return self.readCart(addr)
-        else
-            return 0; // bad place!
     }
 
     pub fn write(self: *BUS, addr: u16, data: u8) void {
-        if ((addr >= 0x80) and (addr <= 0x00FF))
-            self.ram.write(addr, data)
-        else if ((addr >= 0x1000) and (addr <= 0x1FFF))
-            self.car.write(addr, data)
-        else
-            std.debug.print("[warn]: Unhandled write request [Address: 0x{X}]\n", .{addr});
-            return;
+        // Extract Relevent Address bits
+        const a7  = (addr & 0b0000_0000_1000_0000) != 0;
+        const a9  = (addr & 0b0000_0010_0000_0000) != 0;
+        const a12 = (addr & 0b0001_0000_0000_0000) != 0;
+
+        if (a12) {
+            // Cartridge space (0x1000–0x1FFF): A12=1
+            // Standard cartridges are read-only (ROM), so writes are ignored
+            // Note: If the cartridge has RAM (e.g., Super Chip), you could add logic like:
+            // if (addr >= 0x1000 and addr <= 0x107F) {
+            //     self.car[addr & 0x7F] = data;
+            // }
+        } else if (!a7) { // TIA registers (0x0000–0x007F): A12=0, A7=0
+            // self.tia.write(addr & 0x3F, data);
+        } else if (!a9) { // System RAM (RIOT RAM, 0x0080–0x00FF): A12=0, A7=1, A9=0
+            self.riot.writeRam(addr & 0x7F, data);
+        } else { // RIOT I/O registers (0x0280–0x029F): A12=0, A9=1
+            self.riot.write(addr & 0x1F, data);
+        }
     }
-    // 0x0000 - 0x007F - TIA Registers
-    // 0x0200 - 0x02FF - RIOT Registers
-    // 0x1000 - 0x1FFF - ROM
+
 };
 

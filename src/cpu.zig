@@ -5,8 +5,8 @@ const CarryFlag: u8            = 0b00000001; // Bit 0
 const ZeroFlag: u8             = 0b00000010;
 const InterruptDisable: u8     = 0b00000100;
 const DecimalMode: u8          = 0b00001000;
-// const BreakCommand: u8         = 0b00010000;
-// const UnusedFlag: u8           = 0b00100000;
+const BreakCommand: u8         = 0b00010000;
+const UnusedFlag: u8           = 0b00100000;
 const OverflowFlag: u8         = 0b01000000;
 const NegativeFlag: u8         = 0b10000000; // Bit 7
 
@@ -22,15 +22,12 @@ pub const CPU = struct {
     bus: *BUS,
 
     opcode: u16,  // Current OPCode
-    stack: []u16, // Stack array
     cycles: u32,  // Cycles counter
     empty_cycles: u32, // Cycles to sleep as if we're busy
 
     const Self = @This();
 
     pub fn init(alloc: std.mem.Allocator, bus: *BUS) !Self {
-        const stack = try alloc.alloc(u16, 16);
-
         return CPU{
             .a = 0,
             .x = 0,
@@ -39,17 +36,16 @@ pub const CPU = struct {
             .sp = 0xFF,
             .cycles = 0,
             .opcode = 0,
-            .pc = 0xFFFE,
+            .pc = 0xFFFC,
             .status = 0x34,
             .alloc = alloc,
-            .stack = stack,
             .empty_cycles = 0
         };
     }
 
-    pub fn deinit(self: *CPU) void {
-        self.alloc.free(self.stack);
-    }
+    // pub fn deinit(self: *CPU) void {
+    //     self.alloc.free(self.stack);
+    // }
 
     pub fn reset(self: *Self, entrypoint: u16) void {
         self.sp = 0xFF;
@@ -59,13 +55,11 @@ pub const CPU = struct {
         self.opcode = 0;
         self.cycles = 0;
         self.empty_cycles = 0;
-
-        for (self.stack) |*p|
-            p.* = 0;
     }
 
     pub fn readInstruction(self: *Self) void {
         self.opcode = self.bus.read(self.pc);
+        std.debug.print("   OP: 0x{X} PC:0x{X}\n", .{self.opcode, self.pc});
         self.pcIncrement(1);
     }
 
@@ -92,13 +86,13 @@ pub const CPU = struct {
     }
 
     pub fn pushStack(self: *Self, value: u8) void {
-        self.bus.write(0x0100 + @as(u16, self.sp), value);
-        self.sp -= 1;
+        self.bus.writeStack(0x0100 + @as(u16, self.sp), value);
+        self.sp -%= 1;
     }
 
     pub fn pullStack(self: *Self) u8 {
-        self.sp += 1;
-        return self.bus.read(0x0100 + @as(u16, self.sp));
+        self.sp +%= 1;
+        return self.bus.readStack(0x0100 + @as(u16, self.sp));
     }
 
     pub fn setZeroNegative(self: *Self, value: u8) void {
@@ -156,15 +150,16 @@ pub const CPU = struct {
     }
 
     pub fn cycle(self: *Self) void {
-        self.cycleIncrement(1); // Increment cycle counter
         // Sleep few cycles if we need to act busy
         // simulating multi cycle instruction execution
         if (self.empty_cycles > 0) {
             self.empty_cycles = self.empty_cycles - 1;
+            self.cycleIncrement(1); // Increment cycle counter
             return;
         }
         // Read next instruction
         self.readInstruction();
+        std.debug.print("C: {d} O:0x{X} PC:0x{X}\n", .{self.cycles, self.opcode, self.pc });
 
         // TODO: make this with enums
         switch(self.opcode) {
@@ -172,12 +167,14 @@ pub const CPU = struct {
                 self.pcIncrement(1);
                 // Push PC high byte to stack
                 const pc_high: u8 = @intCast((self.pc >> 8) & 0xFF);
-                self.bus.write(0x0100 + @as(u16, self.sp), pc_high);
-                self.sp -%= 1;
+                self.pushStack(pc_high);
+                // self.bus.writeStack(0x0100 + @as(u16, self.sp), pc_high);
+                // self.sp -%= 1;
                 // Push PC low byte to stack
                 const pc_low: u8 = @intCast(self.pc & 0xFF);
-                self.bus.write(0x0100 + @as(u16, self.sp), pc_low);
-                self.sp -%= 1;
+                self.pushStack(pc_low);
+                // self.bus.writeStack(0x0100 + @as(u16, self.sp), pc_low);
+                // self.sp -%= 1;
 
                 const status_with_b = self.status | 0b00010000;
                 self.pushStack(status_with_b);
@@ -597,7 +594,7 @@ pub const CPU = struct {
             0x44 => { // DEC (Decrement memory)
                 self.readInstruction();
 
-                const data = self.bus.readRam(self.opcode);
+                const data = self.bus.read(self.opcode);
                 self.bus.write(self.opcode, data-1);
                 self.setZeroNegative(data-1); // TODO: Verify this
 
@@ -1192,22 +1189,20 @@ pub const CPU = struct {
                 self.readInstruction();
                 self.x = @intCast(self.opcode);
                 self.setZeroNegative(self.x);
-
                 self.empty_cycles = 1;
             },
             0xA4 => { // LDY Zero Page
                 const zp_addr = self.getByte();
                 self.y = self.bus.read(zp_addr);
                 self.setZeroNegative(self.y);
-
                 self.empty_cycles = 2;
             },
             0xA5 => { // LDA (Load Accumulator ZeroPage)
                 const addr = self.bus.read(self.pc);
                 self.pcIncrement(1);
+
                 self.a = self.bus.read(addr);
                 self.setZeroNegative(self.a);
-
                 self.empty_cycles = 2;
             },
             0xA6 => { // LDX (Load Index Register X from Memory)
@@ -1215,26 +1210,22 @@ pub const CPU = struct {
                 self.pcIncrement(1);
                 self.x = self.bus.read(addr);
                 self.setZeroNegative(self.x);
-
                 self.empty_cycles = 2;
             },
             0xA8 => { // TAY - Transfer Accumulator to Y
                 self.y = self.a;
                 self.setZeroNegative(self.y);
-
                 self.empty_cycles = 1;
             },
             0xA9 => { // LDA Immediate
                 self.a = self.bus.read(self.pc);
                 self.pcIncrement(1);
                 self.setZeroNegative(self.a);
-
                 self.empty_cycles = 1;
             },
             0xAA => { // TAX - Transfer Accumulator to X
                 self.x = self.a;
                 self.setZeroNegative(self.x);
-
                 self.empty_cycles = 1;
             },
             0xAC => { // LDY Absolute
@@ -1242,7 +1233,6 @@ pub const CPU = struct {
                 const value = self.bus.read(addr);
                 self.y = value;
                 self.setZeroNegative(value);
-
                 self.empty_cycles = 3;
             },
             0xAD => { // LDA Absolute
@@ -1250,14 +1240,12 @@ pub const CPU = struct {
                 const value = self.bus.read(addr);
                 self.a = value;
                 self.setZeroNegative(value);
-
                 self.empty_cycles = 3;
             },
             0xAE => { // LDX Absolute
                 const addr = self.getWord();
                 self.x = self.bus.read(addr);
                 self.setZeroNegative(self.x);
-
                 self.empty_cycles = 3;
             },
             0xB0 => { // BCS - Branch if Carry Set
@@ -1289,7 +1277,6 @@ pub const CPU = struct {
                 const effective_addr = (zp_addr +% self.x) & 0xFF;
                 self.y = self.bus.read(effective_addr);
                 self.setZeroNegative(self.y);
-
                 self.empty_cycles = 3;
             },
             0xB5 => { // LDA Zero Page,X
@@ -1297,7 +1284,6 @@ pub const CPU = struct {
                 const effective_addr = (zp_addr +% self.x) & 0xFF;
                 self.a = self.bus.read(effective_addr);
                 self.setZeroNegative(self.a);
-
                 self.empty_cycles = 3;
             },
             0xB6 => { // LDX Zero Page,Y
@@ -1305,7 +1291,6 @@ pub const CPU = struct {
                 const effective_addr = (zp_addr +% self.y) & 0xFF;
                 self.x = self.bus.read(effective_addr);
                 self.setZeroNegative(self.x);
-
                 self.empty_cycles = 3;
             },
             0xB8 => { // CLV (Clear Overflow)
@@ -1368,11 +1353,10 @@ pub const CPU = struct {
                 self.setZeroNegative(self.x);
 
                 const temp = @as(u16, low) + @as(u16, self.x);
-                if (temp > 0xFF) {
-                    self.empty_cycles = 4;
-                } else {
+                if (temp > 0xFF)
+                    self.empty_cycles = 4
+                 else
                     self.empty_cycles = 3;
-                }
             },
             0xC0 => { // CPY - Compare Y Immediate
                 const operand = self.bus.read(self.pc);
@@ -1428,14 +1412,12 @@ pub const CPU = struct {
 
                 self.zeroBit(result == 0);
                 self.negativeBit((result & 0x80) != 0);
-
                 self.empty_cycles = 4;
             },
             0xC8 => { // INY (Increment Y)
                 self.y +%= 1;
                 self.zeroBit(self.y == 0);
                 self.negativeBit((self.y & 0x80) != 0);
-
                 self.empty_cycles = 1;
             },
             0xC9 => { // CMP Immediate
@@ -1444,14 +1426,12 @@ pub const CPU = struct {
 
                 self.carryBit(self.a >= value);
                 self.setZeroNegative(result);
-
                 self.empty_cycles = 1;
             },
             0xCA => { // DEX (Decremetn X)
                 self.x -%= 1;
                 self.zeroBit(self.x == 0);
                 self.negativeBit((self.x & 0x80) != 0);
-
                 self.empty_cycles = 1;
             },
             0xCC => { // CPY Absolute
@@ -1461,7 +1441,6 @@ pub const CPU = struct {
 
                 self.carryBit(self.y >= value);
                 self.setZeroNegative(result);
-
                 self.empty_cycles = 3;
             },
             0xCD => { // CMP Absolute
@@ -1471,7 +1450,6 @@ pub const CPU = struct {
 
                 self.carryBit(self.a >= value);
                 self.setZeroNegative(result);
-
                 self.empty_cycles = 3;
             },
             0xCE => { // DEC Absolute
@@ -1481,7 +1459,6 @@ pub const CPU = struct {
 
                 self.bus.write(addr, result);
                 self.setZeroNegative(result);
-
                 self.empty_cycles = 5;
             },
             0xD0 => { // BNE
@@ -1526,7 +1503,6 @@ pub const CPU = struct {
 
                 self.carryBit(self.a >= value);
                 self.setZeroNegative(result);
-
                 self.empty_cycles = 3;
             },
             0xD6 => { // DEC Zero Page,X
@@ -1537,7 +1513,6 @@ pub const CPU = struct {
 
                 self.bus.write(effective_addr, result);
                 self.setZeroNegative(result);
-
                 self.empty_cycles = 5;
             },
             0xD8 => { // CLD (Clear Decimal)
@@ -1576,7 +1551,6 @@ pub const CPU = struct {
 
                 self.bus.write(effective_addr, result);
                 self.setZeroNegative(result);
-
                 self.empty_cycles = 6;
             },
             0xE0 => { // CPX Immediate

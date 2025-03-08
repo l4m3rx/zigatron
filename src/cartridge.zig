@@ -8,15 +8,12 @@ pub const Cartridge = struct {
     const Self = @This();
 
     pub fn init(allocator: std.mem.Allocator, file_path: []const u8) !Cartridge {
-        // Open file
         const file = try std.fs.cwd().openFile(file_path, .{});
         defer file.close();
-
         // Validate size
         const file_size = try file.getEndPos();
         if (file_size < 2048 or file_size > 65536)
             std.debug.print("[warn] Unusual cartridge size: {} bytes. (Expected 2KB-64KB)\n", .{file_size});
-
         // Read the ROM data
         const rom = try file.readToEndAlloc(allocator, file_size);
 
@@ -34,10 +31,11 @@ pub const Cartridge = struct {
 
     // Read from ROM
     pub fn read(self: *Cartridge, addr: u16) u8 {
-        if ((addr >= 0) and (addr <= 0xFFFF)) {
-            if (addr <= self.size) {
-                return self.rom[addr];
-            }
+        // std.debug.print("ROM Read 0x{X}\n", .{addr});
+        if (addr <= self.size) {
+            return self.rom[addr];
+        } else {
+            return self.rom[addr - self.size];
         }
         return 0;
     }
