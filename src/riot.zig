@@ -37,7 +37,7 @@ pub const RIOT = struct {
     }
 
     pub fn writeRam(self: *RIOT, address: u16, data: u8) void {
-        // std.debug.print("[I] RIOT Reading: 0x{X}\n", .{ address });
+        // std.debug.print("[D] RIOT Reading: 0x{X}\n", .{ address });
         if (address < 0x80)
             self.pram[address] = data;
     }

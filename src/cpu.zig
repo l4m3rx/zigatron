@@ -158,7 +158,7 @@ pub const CPU = struct {
         }
         // Read next instruction
         self.readInstruction();
-        std.debug.print("C: {d} O:0x{X} PC:0x{X}\n", .{self.cycles, self.opcode, self.pc });
+        std.debug.print("[D] Cycle: {d} OPCode:0x{X} PC:0x{X}\n", .{self.cycles, self.opcode, self.pc });
 
         // TODO: make this with enums
         switch(self.opcode) {
