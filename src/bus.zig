@@ -47,10 +47,10 @@ pub const BUS = struct {
         if (a12) { // Cartrage memory is selected by A12=1
             return self.car.read(addr & 0x0FFF);
         } else if (a7 and a9) { // RIOT I/O is selected by A12=0, A9=1, A7=1
-            std.debug.print("[D] RIOT Read 0x{X}-0x{X}\n", .{addr, addr & 0x02FF});
+            std.debug.print("[D] RIOT Read 0x{X}/0x{X}\n", .{addr, addr & 0x02FF});
             return self.riot.read(addr & 0x02FF);
         } else if ((!a9) and a7) { // RAM is selected by A12=0, A9=0, A7=1
-            std.debug.print("[D] RAM Read 0x{X}-0x{X}\n", .{addr, addr & 0x7F});
+            std.debug.print("[D] RAM Read 0x{X}/0x{X}\n", .{addr, addr & 0x7F});
             return self.riot.readRam(addr & 0x7F);
         } else { // The TIA chip is addressed by A12=0, A7=0
             return 0;

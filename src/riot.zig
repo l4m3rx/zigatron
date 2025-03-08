@@ -3,23 +3,20 @@ const std = @import("std");
 pub const RIOT = struct {
     allocator: std.mem.Allocator,
     cycles: u16,
-    tim1t: u8,
-    tim8t: u8,
-    tim64t: u8,
-    tim1024t: u8,
+    timer: u8,          // Current timer value
+    interval: u16,      // Countdown interval (1, 8, 64, or 1024)
+    timer_counter: u16, // Counts cycles until the interval is reached
     pram: []u8,
 
     pub fn init(allocator: std.mem.Allocator) !RIOT {
         const pram = try allocator.alloc(u8, 128);
-
         return RIOT{
             .allocator = allocator,
             .pram = pram,
             .cycles = 0,
-            .tim1t = 0,
-            .tim8t = 0,
-            .tim64t = 0,
-            .tim1024t = 0
+            .timer = 0,
+            .interval = 1,
+            .timer_counter = 0,
         };
     }
 
@@ -28,7 +25,6 @@ pub const RIOT = struct {
     }
 
     pub fn readRam(self: *RIOT, address: u16) u8 {
-        // std.debug.print("[I] RIOT Reading: 0x{X}\n", .{ address });
         if (address >= 0x80) {
             std.debug.print("[E] RAM Read Address out of range 0x{X}\n", .{address});
             return 0;
@@ -37,30 +33,54 @@ pub const RIOT = struct {
     }
 
     pub fn writeRam(self: *RIOT, address: u16, data: u8) void {
-        // std.debug.print("[D] RIOT Reading: 0x{X}\n", .{ address });
-        if (address < 0x80)
+        if (address < 0x80) {
             self.pram[address] = data;
+        }
     }
 
     pub fn read(self: *RIOT, address: u16) u8 {
-        std.debug.print("[I] RIOT Reading: 0x{X}\n", .{ address });
-        return self.pram[address];
+        std.debug.print("[I] RIOT Reading: 0x{X}\n", .{address});
+        if (address >= 0x80 and address <= 0xFF) {
+            return self.pram[address - 0x80];
+        } else if (address == 0x284) { // INTIM: Timer read register
+            return self.timer;
+        } else {
+            std.debug.print("[W] Unhandled RIOT read: 0x{X}\n", .{address});
+            return 0;
+        }
     }
 
     pub fn write(self: *RIOT, address: u16, value: u8) void {
-        std.debug.print("[I] RIOT Writing: 0x{X}={d}\n", .{ address, value });
-        self.pram[address] = value;
+        std.debug.print("[I] RIOT Writing: 0x{X}={d}\n", .{address, value});
+        if (address >= 0x80 and address <= 0xFF) {
+            self.pram[address - 0x80] = value;
+        } else if (address == 0x294) { // TIM1T: Set timer, count every cycle
+            self.timer = value;
+            self.interval = 1;
+            self.timer_counter = 0;
+        } else if (address == 0x295) { // TIM8T: Set timer, count every 8 cycles
+            self.timer = value;
+            self.interval = 8;
+            self.timer_counter = 0;
+        } else if (address == 0x296) { // TIM64T: Set timer, count every 64 cycles
+            self.timer = value;
+            self.interval = 64;
+            self.timer_counter = 0;
+        } else if (address == 0x297) { // TIM1024T: Set timer, count every 1024 cycles
+            self.timer = value;
+            self.interval = 1024;
+            self.timer_counter = 0;
+        } else {
+            std.debug.print("[W] Unhandled RIOT write: 0x{X}=0x{X}\n", .{address, value});
+        }
     }
 
     pub fn cycle(self: *RIOT) void {
         self.cycles +%= 1;
-
-        // Timers
-        self.tim1t -%= 1;
-        if ((self.cycles % 8) == 0) self.tim8t -%= 1;
-        if ((self.cycles % 64) == 0) self.tim64t -%= 1;
-        if ((self.cycles % 1024) == 0) self.tim1024t -%= 1;
-        // std.debug.print("[info] TIA Timers: t1: {}, t8: {}, t64: {}, t1024: {}\n",
-        //                      .{self.tim1t, self.tim8t, self.tim64t, self.tim1024t});
+        self.timer_counter +%= 1;
+        if (self.timer_counter >= self.interval) {
+            self.timer -%= 1; // Wrapping subtract for u8
+            self.timer_counter = 0;
+        }
     }
 };
