@@ -62,13 +62,6 @@ pub const CPU = struct {
         self.pcIncrement(1);
     }
 
-    pub fn crossSleep(self: *Self, base_addr: u16, effective_addr: u16, s: u8) void {
-        if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
-            self.empty_cycles = s+1
-        else
-            self.empty_cycles = s;
-    }
-
     pub fn getWord(self: *Self) u16 {
         const low = self.bus.read(self.pc);
         self.pcIncrement(1);
@@ -82,6 +75,12 @@ pub const CPU = struct {
         const byte = self.bus.read(self.pc);
         self.pcIncrement(1);
         return byte;
+    }
+
+    pub fn samePage(fpage: i32, spage: i32) u8 {
+        if ((fpage & 0xFF00) != (spage & 0xFF00))
+            return 1;
+        return 0;
     }
 
     pub fn pushStack(self: *Self, value: u8) void {
@@ -274,7 +273,7 @@ pub const CPU = struct {
                 if ((self.status & 0x80) == 0) {
                     const wide: i32 = self.pc;
                     self.pc = @intCast(wide + offset);
-                    self.crossSleep(@intCast(wide), self.pc, 2);
+                    self.empty_cycles = 2 + samePage(wide, self.pc);
                 } else {
                     self.empty_cycles = 1;
                 }
@@ -290,7 +289,7 @@ pub const CPU = struct {
                 self.a |= value;
 
                 self.setZeroNegative(self.a);
-                self.crossSleep(base_addr, effective_addr, 4);
+                self.empty_cycles = 4 + samePage(base_addr, effective_addr);
             },
             0x15 => { // ORA Zero Page,X
                 const zp_addr = self.getByte();
@@ -328,10 +327,11 @@ pub const CPU = struct {
 
                 self.setZeroNegative(self.a);
 
-                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
-                    self.empty_cycles = 4
-                else
-                    self.empty_cycles = 3;
+                self.empty_cycles = 3 + samePage(base_addr, effective_addr);
+                // if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
+                //     self.empty_cycles = 4
+                // else
+                //     self.empty_cycles = 3;
             },
             0x1D => { // ORA Absolute,X
                 const base_addr = self.getWord();
@@ -342,10 +342,11 @@ pub const CPU = struct {
 
                 self.setZeroNegative(self.a);
 
-                if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
-                    self.empty_cycles = 4
-                else
-                    self.empty_cycles = 3;
+                self.empty_cycles = 3 + samePage(base_addr, effective_addr);
+                // if ((base_addr & 0xFF00) != (effective_addr & 0xFF00))
+                //     self.empty_cycles = 4
+                // else
+                //     self.empty_cycles = 3;
             },
             0x1E => { // ASL Absolute,X
                 const base_addr = self.getWord();
@@ -389,7 +390,7 @@ pub const CPU = struct {
                 self.a &= value;
 
                 self.setZeroNegative(self.a);
-                self.crossSleep(base_addr, effective_addr, 3);
+                self.empty_cycles = 3 + samePage(base_addr, effective_addr);
             },
             0x24 => { // BIT Zero Page
                 const zp_addr = self.getByte();
@@ -495,7 +496,7 @@ pub const CPU = struct {
                 if ((self.status & 0x80) != 0) { // Negative flag set
                     const wide: i32 = self.pc;
                     self.pc = @intCast(wide + offset);
-                    self.crossSleep(@intCast(wide), self.pc, 2);
+                    self.empty_cycles = 2 + samePage(wide, self.pc);
                 } else {
                     self.empty_cycles = 1;
                 }
@@ -511,7 +512,7 @@ pub const CPU = struct {
                 self.a ^= value;
 
                 self.setZeroNegative(self.a);
-                self.crossSleep(base_addr, effective_addr, 4);
+                self.empty_cycles = 4 + samePage(base_addr, effective_addr);
             },
             0x35 => { // AND Zero Page,X
                 const zp_addr = self.getByte();
@@ -534,7 +535,7 @@ pub const CPU = struct {
                 self.a &= value;
 
                 self.setZeroNegative(self.a);
-                self.crossSleep(base_addr, effective_addr, 3);
+                self.empty_cycles = 3 + samePage(base_addr, effective_addr);
             },
             0x3D => { // AND Absolute,X
                 const base_addr = self.getWord();
@@ -544,7 +545,7 @@ pub const CPU = struct {
                 self.a &= value;
 
                 self.setZeroNegative(self.a);
-                self.crossSleep(base_addr, effective_addr, 3);
+                self.empty_cycles = 3 + samePage(base_addr, effective_addr);
             },
             0x3E => { // ROL Absolute,X
                 const base_addr = self.getWord();
@@ -676,12 +677,12 @@ pub const CPU = struct {
                     const wide: i32 = self.pc;
                     self.pc +%= @intCast(wide + offset);
 
-                    // Check page boundary crossing
-                    if ((wide & 0xFF00) != (self.pc & 0xFF00)) {
-                        self.empty_cycles = 3;
-                    } else {
-                        self.empty_cycles = 2;
-                    }
+                    self.empty_cycles = 3 + samePage(wide, self.pc);
+                    // if ((wide & 0xFF00) != (self.pc & 0xFF00)) {
+                    //     self.empty_cycles = 3;
+                    // } else {
+                    //     self.empty_cycles = 2;
+                    // }
                 } else {
                     self.empty_cycles = 1;
                 }
@@ -697,7 +698,7 @@ pub const CPU = struct {
                 self.a ^= value;
 
                 self.setZeroNegative(self.a);
-                self.crossSleep(base_addr, effective_addr, 4);
+                self.empty_cycles = 4 + samePage(base_addr, effective_addr);
             },
             0x55 => { // EOR Zero Page,X
                 const zp_addr = self.getByte();
@@ -733,7 +734,7 @@ pub const CPU = struct {
                 self.a ^= value;
 
                 self.setZeroNegative(self.a);
-                self.crossSleep(base_addr, effective_addr, 3);
+                self.empty_cycles = 3 + samePage(base_addr, effective_addr);
             },
             0x5D => { // EOR Absolute,X
                 const base_addr = self.getWord();
@@ -743,7 +744,7 @@ pub const CPU = struct {
                 self.a ^= value;
 
                 self.setZeroNegative(self.a);
-                self.crossSleep(base_addr, effective_addr, 3);
+                self.empty_cycles = 3 + samePage(base_addr, effective_addr);
             },
             0x5E => { // LSR Absolute,X
                 const base_addr = self.getWord();
@@ -918,7 +919,7 @@ pub const CPU = struct {
                 if ((self.status & 0x40) != 0) { // Overflow flag (bit 6) set
                     const wide: i32 = self.pc;
                     self.pc +%= @intCast(wide + offset);
-                    self.crossSleep(@intCast(wide), self.pc, 2);
+                    self.empty_cycles = 2 + samePage(wide, self.pc);
                 } else {
                     self.empty_cycles = 1;
                 }
@@ -943,7 +944,7 @@ pub const CPU = struct {
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
                 self.overflowBit(overflow);
 
-                self.crossSleep(base_addr, effective_addr, 4);
+                self.empty_cycles = 4 + samePage(base_addr, effective_addr);
             },
             0x75 => { // ADC Zero Page,X
                 const zp_addr = self.getByte();
@@ -999,7 +1000,7 @@ pub const CPU = struct {
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
                 self.overflowBit(overflow);
 
-                self.crossSleep(base_addr, effective_addr, 3);
+                self.empty_cycles = 3 + samePage(base_addr, effective_addr);
             },
             0x7D => { // ADC Absolute,X
                 const base_addr = self.getWord();
@@ -1018,7 +1019,7 @@ pub const CPU = struct {
                 const overflow = ((a ^ result) & (operand ^ result) & 0x80) != 0;
                 self.overflowBit(overflow);
 
-                self.crossSleep(base_addr, effective_addr, 3);
+                self.empty_cycles = 3 + samePage(base_addr, effective_addr);
             },
             0x7E => { // ROR Absolute,X
                 const base_addr = self.getWord();
@@ -1102,7 +1103,7 @@ pub const CPU = struct {
                 if ((self.status & 0x01) == 0) { // Carry flag clear
                     const wide: i32 = self.pc;
                     self.pc +%= @intCast(wide + offset);
-                    self.crossSleep(@intCast(wide), self.pc, 2);
+                    self.empty_cycles = 2 + samePage(wide, self.pc);
                 } else {
                     self.empty_cycles = 1;
                 }
@@ -1254,7 +1255,7 @@ pub const CPU = struct {
                 if ((self.status & 0x01) != 0) { // Carry flag set
                     const wide: i32 = self.pc;
                     self.pc = @intCast(wide + offset);
-                    self.crossSleep(@intCast(wide), self.pc, 2);
+                    self.empty_cycles = 2 + samePage(wide, self.pc);
                 } else {
                     self.empty_cycles = 1;
                 }
@@ -1269,7 +1270,7 @@ pub const CPU = struct {
                 self.a = self.bus.read(effective_addr);
                 self.setZeroNegative(self.a);
 
-                self.crossSleep(base_addr, effective_addr, 4);
+                self.empty_cycles = 4 + samePage(base_addr, effective_addr);
             },
             0xB4 => { // LDY Zero Page,X
                 const zp_addr = self.getByte();
@@ -1302,7 +1303,7 @@ pub const CPU = struct {
                 self.a = self.bus.read(effective_addr);
                 self.setZeroNegative(self.a);
 
-                self.crossSleep(base_addr, effective_addr, 3);
+                self.empty_cycles = 3 + samePage(base_addr, effective_addr);
             },
             0xBA => { // TSX - Transfer Stack Pointer to X
                 self.x = self.sp;
@@ -1317,7 +1318,7 @@ pub const CPU = struct {
                 self.y = self.bus.read(effective_addr);
                 self.setZeroNegative(self.y);
 
-                self.crossSleep(base_addr, effective_addr, 3);
+                self.empty_cycles = 3 + samePage(base_addr, effective_addr);
             },
             0xBD => { // LDA Absolute,X
                 const low = self.bus.read(self.pc);
@@ -1465,17 +1466,12 @@ pub const CPU = struct {
                 const offset: i16 = @intCast(self.bus.read(self.pc));
                 self.pcIncrement(1);
 
-                // Check if zero flag is clear (bit 1 of status is 0)
-                if ((self.status & 0x02) == 0) {
+                // Check if zero flag is clear
+                if ((self.status & ZeroFlag) == 0) {
                     const wide: i32 = self.pc;
                     self.pc +%= @intCast(wide + offset);
 
-                    // Check if page boundary is crossed
-                    if ((wide & 0xFF00) != (self.pc & 0xFF00)) {
-                        self.empty_cycles = 3;
-                    } else {
-                        self.empty_cycles = 2;
-                    }
+                    self.empty_cycles = 2 + samePage(wide, self.pc);
                 } else {
                     self.empty_cycles = 1;
                 }
@@ -1492,7 +1488,7 @@ pub const CPU = struct {
 
                 self.carryBit(self.a >= value);
                 self.setZeroNegative(result);
-                self.crossSleep(base_addr, effective_addr, 4);
+                self.empty_cycles = 4 + samePage(base_addr, effective_addr);
             },
             0xD5 => { // CMP Zero Page,X
                 const zp_addr = self.bus.read(self.pc);
@@ -1527,7 +1523,7 @@ pub const CPU = struct {
                 self.carryBit(self.a >= value);
                 self.setZeroNegative(result);
 
-                self.crossSleep(base_addr, effective_addr, 3);
+                self.empty_cycles = 3 + samePage(base_addr, effective_addr);
             },
             0xDD => { // CMP Absolute,X
                 const base_addr = self.getWord();
@@ -1539,7 +1535,7 @@ pub const CPU = struct {
                 self.carryBit(self.a >= value);
                 self.setZeroNegative(result);
 
-                self.crossSleep(base_addr, effective_addr, 3);
+                self.empty_cycles = 3 + samePage(base_addr, effective_addr);
             },
             0xDE => { // DEC Absolute,X
                 const base_addr = self.getWord();
@@ -1583,7 +1579,7 @@ pub const CPU = struct {
                 const overflow = ((a ^ result) & (a ^ operand) & 0x80) != 0;
                 self.overflowBit(overflow);
 
-                self.crossSleep(base_addr, effective_addr, 4);
+                self.empty_cycles = 4 + samePage(base_addr, effective_addr);
             },
             0xE4 => { // CPX Zero Page
                 const zp_addr = self.bus.read(self.pc);
@@ -1697,11 +1693,11 @@ pub const CPU = struct {
                     const wide: i32 = self.pc;
                     self.pc +%= @intCast(wide + offset);
 
-                    if ((wide & 0xFF00) != (self.pc & 0xFF00))
-                        self.empty_cycles = 3
-                    else
-                        self.empty_cycles = 2;
-                    // self.crossSleep(wide, self.pc, 2);
+                    self.empty_cycles = 2 + samePage(wide, self.pc);
+                    // if ((wide & 0xFF00) != (self.pc & 0xFF00))
+                    //     self.empty_cycles = 3
+                    // else
+                    //     self.empty_cycles = 2;
                 } else {
                     self.empty_cycles = 1;
                 }
@@ -1728,7 +1724,7 @@ pub const CPU = struct {
                 const overflow = ((a ^ result) & (a ^ operand) & 0x80) != 0;
                 self.overflowBit(overflow);
 
-                self.crossSleep(base_addr, effective_addr, 4);
+                self.empty_cycles = 4 + samePage(base_addr, effective_addr);
             },
             0xF5 => { // SBC Zero Page,X
                 const zp_addr = self.bus.read(self.pc);
@@ -1783,7 +1779,7 @@ pub const CPU = struct {
                 const overflow = ((a ^ result) & (a ^ operand) & 0x80) != 0;
                 self.overflowBit(overflow);
 
-                self.crossSleep(base_addr, effective_addr, 3);
+                self.empty_cycles = 3 + samePage(base_addr, effective_addr);
             },
             0xFE => { // INC Absolute,X
                 const base_addr = self.getWord();
@@ -1813,7 +1809,7 @@ pub const CPU = struct {
                 const overflow = ((a ^ result) & (a ^ operand) & 0x80) != 0;
                 self.overflowBit(overflow);
 
-                self.crossSleep(base_addr, effective_addr, 4);
+                self.empty_cycles = 4 + samePage(base_addr, effective_addr);
             },
             else => {
                 std.debug.print("[warn] Unimplemented instruction 0x{X}\n", .{self.opcode});

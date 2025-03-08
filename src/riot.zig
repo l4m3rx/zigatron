@@ -39,10 +39,12 @@ pub const RIOT = struct {
     }
 
     pub fn read(self: *RIOT, address: u16) u8 {
-        std.debug.print("[I] RIOT Reading: 0x{X}\n", .{address});
+        std.debug.print("[D] RIOT Reading: 0x{X}\n", .{address});
         if (address >= 0x80 and address <= 0xFF) {
+            std.debug.print("[D] RIOT RAM Read: 0x{X}\n", .{address});
             return self.pram[address - 0x80];
         } else if (address == 0x284) { // INTIM: Timer read register
+            std.debug.print("[D] RIOT Timer Value: {}\n", .{self.timer});
             return self.timer;
         } else {
             std.debug.print("[W] Unhandled RIOT read: 0x{X}\n", .{address});
@@ -51,7 +53,7 @@ pub const RIOT = struct {
     }
 
     pub fn write(self: *RIOT, address: u16, value: u8) void {
-        std.debug.print("[I] RIOT Writing: 0x{X}={d}\n", .{address, value});
+        std.debug.print("[D] RIOT Writing: 0x{X}={d}\n", .{address, value});
         if (address >= 0x80 and address <= 0xFF) {
             self.pram[address - 0x80] = value;
         } else if (address == 0x294) { // TIM1T: Set timer, count every cycle
