@@ -1396,20 +1396,36 @@ pub const CPU = struct {
                 self.setZeroNegative(result);
                 self.empty_cycles = 5;
             },
-            0xD0 => { // BNE
-                // Read the signed 16-bit offset
-                const offset: i16 = @intCast(self.bus.read(self.pc));
+            0xD0 => { // BNE - Branch if Not Equal
+                const offset: u8 = @bitCast(self.bus.read(self.pc));
                 self.pcIncrement(1);
 
-                // Check if zero flag is clear
+                // Check if the Zero Flag is clear
                 if ((self.status & ZeroFlag) == 0) {
-                    const wide: i32 = self.pc;
-                    self.pc +%= @intCast(wide + offset);
-                    self.empty_cycles = 2 + samePage(wide, self.pc);
+                    const old_pc: u16 = self.pc; // Store current PC before branching
+                    const new_pc: u16 = self.pc + offset;
+
+                    self.pc = new_pc; // Update PC to the new address
+                    std.debug.print("[D] OPC: 0x{X} NPC: 0x{X} OF:0x{X}\n", .{old_pc, self.pc, offset});
+                    self.empty_cycles = 2 + samePage(old_pc, self.pc);
                 } else {
                     self.empty_cycles = 1;
                 }
             },
+            // 0xD0 => { // BNE
+            //     // Read the signed 16-bit offset
+            //     const offset: i16 = @intCast(self.bus.read(self.pc));
+            //     self.pcIncrement(1);
+
+            //     // Check if zero flag is clear
+            //     if ((self.status & ZeroFlag) == 0) {
+            //         const wide: i32 = self.pc;
+            //         self.pc +%= @intCast(wide + offset);
+            //         self.empty_cycles = 2 + samePage(wide, self.pc);
+            //     } else {
+            //         self.empty_cycles = 1;
+            //     }
+            // },
             0xD1 => { // CMP (Indirect,Y)
                 const zp_addr = self.bus.read(self.pc);
                 const low = self.bus.read(zp_addr);

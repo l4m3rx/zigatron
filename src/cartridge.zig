@@ -1,7 +1,26 @@
 const std = @import("std");
 
+
+const CartridgeType = enum {
+    STANDARD,
+    BANK_SWITCHING,
+    ENHANCED,
+    UNKNOWN,
+};
+
+const ROMHeader = struct {
+    signature: u32,
+    mapperType: u8,
+};
+
+
 pub const Cartridge = struct {
     allocator: std.mem.Allocator,
+    type: CartridgeType = undefined,
+    header: ROMHeader = ROMHeader{
+        .signature = 0,
+        .mapperType = 0
+    },
     rom: []u8 = undefined,
     size: usize = 0,
     nmi: u16 = 0,
@@ -21,6 +40,38 @@ pub const Cartridge = struct {
         self.allocator.free(self.rom);
     }
 
+    // Function to parse the header (simplified)
+    fn parseHeader(self: *Cartridge) void {
+        if (self.rom.len >= 4)
+            self.header.signature = (@as(u32, self.rom[0])) |
+                                    (@as(u32, self.rom[1]) << 8)  |
+                                    (@as(u32, self.rom[2]) << 16) |
+                                    (@as(u32, self.rom[3]) << 24);
+            std.debug.print("[D] Cartridge Signature : 0x{X}\n", .{self.header.signature});
+
+        if (self.rom.len >= 5)
+            self.header.mapperType = self.rom[4];
+            std.debug.print("[D] Cartridge MapperType: 0x{X}\n", .{self.rom[4]});
+    }
+
+    // Function to identify cartridge type based on header and signatures
+    fn identifyCartridgeType(self: *Cartridge) ?CartridgeType {
+        self.parseHeader();
+        // Check signature
+        switch (self.header.signature) {
+            0x544F5243 => return CartridgeType.STANDARD,
+            0x42414E4B => return CartridgeType.BANK_SWITCHING,
+            0x454E4843 => return CartridgeType.ENHANCED,
+            else => return CartridgeType.STANDARD,
+        }
+        // Additional logic based on mapperType if no signature matches
+        switch (self.header.mapperType) {
+            0x01 => return CartridgeType.BANK_SWITCHING,
+            0x02 => return CartridgeType.ENHANCED,
+            else => return CartridgeType.STANDARD,
+        }
+    }
+
     // Load cartrage
     pub fn load(self: *Cartridge, filePath: []const u8) !void {
         const file = try std.fs.cwd().openFile(filePath, .{});
@@ -29,11 +80,14 @@ pub const Cartridge = struct {
         // Validate size
         self.size = try file.getEndPos();
         if (self.size < 2048 or self.size > 65536)
-            std.debug.print("[warn] Unusual cartridge size: {} bytes. (Expected 2KB-64KB)\n", .{self.size});
+            std.debug.print("[W] Unusual cartridge size: {} bytes. (Expected 2KB-64KB)\n", .{self.size});
 
         // Read the ROM data
         self.rom = try file.readToEndAlloc(self.allocator, self.size);
 
+        // Find Cartridge Type
+        if (self.identifyCartridgeType()) |t|
+            self.type = t;
         // Set NMI Vector, Reset Vector, Entry Point
         if (self.getNmiVector()) |nmi|
             self.nmi = nmi;
@@ -45,7 +99,7 @@ pub const Cartridge = struct {
 
     // Read from ROM
     pub fn read(self: *Cartridge, addr: u16) u8 {
-        // std.debug.print("ROM Read 0x{X}\n", .{addr});
+        // std.debug.print("[D] ROM Read 0x{X}\n", .{addr});
         if (addr <= self.size) {
             return self.rom[addr];
         } else {
@@ -91,8 +145,9 @@ pub const Cartridge = struct {
                 return vector;
             } else {
                 std.debug.print("[I] Cartrage:\n\tReset Vector   0x{X:0>4}\n", .{vector});
-                std.debug.print("\tExpected range 0x1000-0x1FFF\n\tSetting value  0x{X}\n", .{vector + 0x1000});
-                return vector + 0x1000;
+                // std.debug.print("\tExpected range 0x1000-0x1FFF\n\tSetting value  0x{X}\n", .{vector + 0x1000});
+                // return vector + 0x1000;
+                return vector;
             }
         }
         return null;
