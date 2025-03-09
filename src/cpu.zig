@@ -100,9 +100,9 @@ pub const CPU = struct {
 
     pub fn setOverflow(self: *Self, value: u8) void {
         if (value & 0x40 != 0)
-            self.status |= 0x40
+            self.overflowBit(true)
         else
-            self.status &= ~@as(u8, 0x40);
+            self.overflowBit(true);
     }
 
     pub fn interruptBit(self: *Self, b: bool) void {
@@ -148,37 +148,28 @@ pub const CPU = struct {
     }
 
     pub fn cycle(self: *Self) void {
-        // Sleep few cycles if we need to act busy
-        // simulating multi cycle instruction execution
-        if (self.empty_cycles > 0) {
+        self.cycleIncrement(1);
+        if (self.empty_cycles > 0) { // Sleep acting busy
             self.empty_cycles = self.empty_cycles - 1;
-            self.cycleIncrement(1); // Increment cycle counter
             return;
         }
         // Read next instruction
         self.readInstruction();
         std.debug.print("[D] Cycle: {d} OPCode:0x{X} PC:0x{X}\n", .{self.cycles, self.opcode, self.pc });
 
-        // TODO: make this with enums
+        // TODO: speedup
         switch(self.opcode) {
             0x0 => {
                 self.pcIncrement(1);
-                // Push PC high byte to stack
                 const pc_high: u8 = @intCast((self.pc >> 8) & 0xFF);
                 self.pushStack(pc_high);
-                // self.bus.writeStack(0x0100 + @as(u16, self.sp), pc_high);
-                // self.sp -%= 1;
-                // Push PC low byte to stack
                 const pc_low: u8 = @intCast(self.pc & 0xFF);
                 self.pushStack(pc_low);
-                // self.bus.writeStack(0x0100 + @as(u16, self.sp), pc_low);
-                // self.sp -%= 1;
 
                 const status_with_b = self.status | 0b00010000;
                 self.pushStack(status_with_b);
-                // Set the I flag (bit 2)
-                self.status |= 0b00000100;
-                // Jump to IRQ vector at $FFFE-$FFFF
+                self.interruptBit(true);
+
                 const irq_low = self.bus.read(0xFFFE);
                 const irq_high = self.bus.read(0xFFFF);
                 self.pc = (@as(u16, irq_high) << 8) | irq_low;
@@ -188,6 +179,7 @@ pub const CPU = struct {
             0x01 => { // ORA (Indirect,X)
                 const zp_addr = self.getByte();
                 const effective_zp = (zp_addr +% self.x) & 0xFF;
+
                 const low = self.bus.read(effective_zp);
                 const high = self.bus.read((effective_zp +% 1) & 0xFF);
                 const effective_addr = (@as(u16, high) << 8) | low;
@@ -253,6 +245,7 @@ pub const CPU = struct {
                 const addr = self.getWord();
                 const value = self.bus.read(addr);
                 const carry_out = (value & 0x80) != 0;
+
                 const result = value << 1;
                 self.bus.write(addr, result);
 
@@ -275,8 +268,10 @@ pub const CPU = struct {
             },
             0x11 => { // ORA (Indirect,Y)
                 const zp_addr = self.getByte();
+
                 const low = self.bus.read(zp_addr);
                 const high = self.bus.read((zp_addr +% 1) & 0xFF);
+
                 const base_addr = (@as(u16, high) << 8) | low;
                 const effective_addr = base_addr +% @as(u16, self.y);
 
@@ -289,6 +284,7 @@ pub const CPU = struct {
             0x15 => { // ORA Zero Page,X
                 const zp_addr = self.getByte();
                 const effective_addr = (zp_addr +% self.x) & 0xFF;
+
                 const value = self.bus.read(effective_addr);
                 self.a |= value;
 
@@ -382,10 +378,7 @@ pub const CPU = struct {
                 const result = self.a & value;
 
                 self.setZeroNegative(result);
-                if (value & 0x40 != 0)
-                    self.status |= 0x40
-                else
-                    self.status &= ~@as(u8, 0x40);
+                self.setOverflow(value);
 
                 self.empty_cycles = 2;
             },
@@ -482,8 +475,10 @@ pub const CPU = struct {
             },
             0x31 => { // EOR (Indirect,Y)
                 const zp_addr = self.getByte();
+
                 const low = self.bus.read(zp_addr);
                 const high = self.bus.read((zp_addr +% 1) & 0xFF);
+
                 const base_addr = (@as(u16, high) << 8) | low;
                 const effective_addr = base_addr +% @as(u16, self.y);
 
@@ -558,6 +553,7 @@ pub const CPU = struct {
             0x41 => { // EOR (Indirect,X)
                 const zp_addr = self.getByte();
                 const effective_zp = (zp_addr +% self.x) & 0xFF;
+
                 const low = self.bus.read(effective_zp);
                 const high = self.bus.read((effective_zp +% 1) & 0xFF);
                 const effective_addr = (@as(u16, high) << 8) | low;
@@ -1412,20 +1408,6 @@ pub const CPU = struct {
                     self.empty_cycles = 1;
                 }
             },
-            // 0xD0 => { // BNE
-            //     // Read the signed 16-bit offset
-            //     const offset: i16 = @intCast(self.bus.read(self.pc));
-            //     self.pcIncrement(1);
-
-            //     // Check if zero flag is clear
-            //     if ((self.status & ZeroFlag) == 0) {
-            //         const wide: i32 = self.pc;
-            //         self.pc +%= @intCast(wide + offset);
-            //         self.empty_cycles = 2 + samePage(wide, self.pc);
-            //     } else {
-            //         self.empty_cycles = 1;
-            //     }
-            // },
             0xD1 => { // CMP (Indirect,Y)
                 const zp_addr = self.bus.read(self.pc);
                 const low = self.bus.read(zp_addr);
