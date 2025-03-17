@@ -47,11 +47,9 @@ pub const Cartridge = struct {
                                     (@as(u32, self.rom[1]) << 8)  |
                                     (@as(u32, self.rom[2]) << 16) |
                                     (@as(u32, self.rom[3]) << 24);
-            std.debug.print("[D] Cartridge Signature : 0x{X}\n", .{self.header.signature});
 
         if (self.rom.len >= 5)
             self.header.mapperType = self.rom[4];
-            std.debug.print("[D] Cartridge MapperType: 0x{X}\n", .{self.rom[4]});
     }
 
     // Function to identify cartridge type based on header and signatures
@@ -166,9 +164,11 @@ pub const Cartridge = struct {
     // Basic cartridge info
     pub fn printInfo(self: Self) void {
         std.debug.print("[I] Cartridge:\n", .{});
+        std.debug.print("\tType:         {}\n", .{self.type});
         std.debug.print("\tSize:         {} bytes\n", .{self.size});
         std.debug.print("\tNMI Vector:   0x{X:0>4}\n", .{self.nmi});
         std.debug.print("\tReset Vector: 0x{X:0>4}\n", .{self.reset});
         std.debug.print("\tEntry Point:  0x{X:0>4}\n", .{self.entry});
+        std.debug.print("\tSignature :   0x{X:0>4}\n", .{self.header.signature});
     }
 };

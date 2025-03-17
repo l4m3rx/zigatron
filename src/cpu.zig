@@ -59,6 +59,7 @@ pub const CPU = struct {
 
     pub fn readInstruction(self: *Self) void {
         self.opcode = self.bus.read(self.pc);
+        std.debug.print("[D] Cycle: {d} OPCode:0x{X} PC:0x{X}\n", .{self.cycles, self.opcode, self.pc });
         self.pcIncrement(1);
     }
 
@@ -155,7 +156,7 @@ pub const CPU = struct {
         }
         // Read next instruction
         self.readInstruction();
-        std.debug.print("[D] Cycle: {d} OPCode:0x{X} PC:0x{X}\n", .{self.cycles, self.opcode, self.pc });
+        // std.debug.print("[D] Cycle: {d} OPCode:0x{X} PC:0x{X}\n", .{self.cycles, self.opcode, self.pc });
 
         // TODO: speedup
         switch(self.opcode) {
@@ -218,12 +219,12 @@ pub const CPU = struct {
                 self.empty_cycles = 2;
             },
             0x09 => { // ORA Immediate
-                const value = self.bus.read(self.pc);
-                self.pcIncrement(1);
+                self.readInstruction();
 
-                self.a |= value;
+                self.a |= @intCast(self.opcode);
                 self.setZeroNegative(self.a);
-                self.empty_cycles = 1;
+
+                self.readInstruction();
             },
             0x0A => { // ASL (Arithmetic Shift Left)
                 const carry = (self.a & 0x80) != 0;
@@ -1129,7 +1130,8 @@ pub const CPU = struct {
                 self.readInstruction();
                 self.x = @intCast(self.opcode);
                 self.setZeroNegative(self.x);
-                self.empty_cycles = 1;
+                self.readInstruction();
+                // self.empty_cycles = 1;
             },
             0xA4 => { // LDY Zero Page
                 const zp_addr = self.getByte();
@@ -1138,19 +1140,22 @@ pub const CPU = struct {
                 self.empty_cycles = 2;
             },
             0xA5 => { // LDA (Load Accumulator ZeroPage)
-                const addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
+                self.readInstruction();
 
-                self.a = self.bus.read(addr);
+                self.a = self.bus.read(self.opcode);
                 self.setZeroNegative(self.a);
-                self.empty_cycles = 2;
+
+                self.readInstruction();
+                self.empty_cycles = 1;
             },
             0xA6 => { // LDX (Load Index Register X from Memory)
-                const addr = self.bus.read(self.pc);
-                self.pcIncrement(1);
-                self.x = self.bus.read(addr);
+                self.readInstruction();
+
+                self.x = self.bus.read(self.opcode);
                 self.setZeroNegative(self.x);
-                self.empty_cycles = 2;
+
+                self.readInstruction();
+                self.empty_cycles = 1;
             },
             0xA8 => { // TAY - Transfer Accumulator to Y
                 self.y = self.a;
@@ -1347,6 +1352,7 @@ pub const CPU = struct {
             },
             0xC8 => { // INY (Increment Y)
                 self.y +%= 1;
+
                 self.zeroBit(self.y == 0);
                 self.negativeBit((self.y & 0x80) != 0);
                 self.empty_cycles = 1;
@@ -1361,6 +1367,7 @@ pub const CPU = struct {
             },
             0xCA => { // DEX (Decremetn X)
                 self.x -%= 1;
+
                 self.zeroBit(self.x == 0);
                 self.negativeBit((self.x & 0x80) != 0);
                 self.empty_cycles = 1;
@@ -1393,7 +1400,8 @@ pub const CPU = struct {
                 self.empty_cycles = 5;
             },
             0xD0 => { // BNE - Branch if Not Equal
-                const offset: u8 = @bitCast(self.bus.read(self.pc));
+                // const offset: u8 = @bitCast(self.bus.read(self.pc));
+                const offset: u8 = @intCast(self.opcode); //// todo:::
                 self.pcIncrement(1);
 
                 // Check if the Zero Flag is clear
@@ -1402,7 +1410,7 @@ pub const CPU = struct {
                     const new_pc: u16 = self.pc + offset;
 
                     self.pc = new_pc; // Update PC to the new address
-                    std.debug.print("[D] OPC: 0x{X} NPC: 0x{X} OF:0x{X}\n", .{old_pc, self.pc, offset});
+                    std.debug.print("[D] SET OPC: 0x{X} NPC: 0x{X} OF:0x{X}\n", .{old_pc, self.pc, offset});
                     self.empty_cycles = 2 + samePage(old_pc, self.pc);
                 } else {
                     self.empty_cycles = 1;

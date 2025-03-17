@@ -45,7 +45,7 @@ pub const BUS = struct {
         const a12 = (addr & 0b0001_0000_0000_0000) != 0;
 
         if (a12) { // Cartrage memory is selected by A12=1
-            return self.car.read(addr & 0x0FFF);
+            return self.car.read((addr - 0x1000) & 0x0FFF);
         } else if (a7 and a9) { // RIOT I/O is selected by A12=0, A9=1, A7=1
             std.debug.print("[D] Timer Read 0x{X}/0x{X}\n", .{addr, addr & 0x02FF});
             return self.riot.read(addr & 0x02FF);
