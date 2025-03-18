@@ -1,19 +1,22 @@
 const std = @import("std");
+const TIA = @import("tia.zig").TIA;
 const CAR = @import("cartridge.zig").Cartridge;
 const RIOT = @import("riot.zig").RIOT;
 
 
 pub const BUS = struct {
     allocator: std.mem.Allocator,
+    tia: *TIA = undefined,
     car: *CAR = undefined,
     riot: *RIOT = undefined,
     bus: []u8,
 
-    pub fn init(allocator: std.mem.Allocator, car: *CAR, riot: *RIOT) !BUS {
+    pub fn init(allocator: std.mem.Allocator, car: *CAR, riot: *RIOT, tia: *TIA) !BUS {
         const bus = try allocator.alloc(u8, 1024);
         return BUS{
             .allocator = allocator,
             .bus = bus,
+            .tia = tia,
             .car = car,
             .riot = riot
         };
@@ -53,8 +56,8 @@ pub const BUS = struct {
             std.debug.print("[D] RAM Read 0x{X}/0x{X}\n", .{addr, addr & 0x7F});
             return self.riot.readRam(addr & 0x7F);
         } else { // The TIA chip is addressed by A12=0, A7=0
-            return 0;
-            // return self.tia.read((addr & 0x0F) | 0x30);
+            // return 0;
+            return self.tia.read((addr & 0x0F) | 0x30);
         }
     }
 
@@ -72,7 +75,7 @@ pub const BUS = struct {
             //     self.car[addr & 0x7F] = data;
             // }
         } else if (!a7) { // TIA registers (0x0000–0x007F): A12=0, A7=0
-            // self.tia.write(addr & 0x3F, data);
+            self.tia.write(addr & 0x3F, data);
         } else if (!a9) { // System RAM (RIOT RAM, 0x0080–0x00FF): A12=0, A7=1, A9=0
             self.riot.writeRam(addr & 0x7F, data);
         } else { // RIOT I/O registers (0x0280–0x029F): A12=0, A9=1
