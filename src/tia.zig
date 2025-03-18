@@ -1,6 +1,6 @@
 const std = @import("std");
 
-//   NTSC
+//   160 x 192 pixels (NTSC)
 //
 //   | Clock Counts
 //   |<--------------------- 228 --------------------->|
@@ -155,44 +155,44 @@ pub const TIA = struct {
 
     pub fn write(self: *TIA, address: u16, data: u8) void {
         switch (address) {
-            0x00 => self.vsync = (data & 0x02) != 0,   // VSYNC
-            0x01 => self.vblank = (data & 0x02) != 0,  // VBLANK
-            0x02 => {},                                // WSYNC (TODO: Sync CPU to HBLANK)
-            0x05 => self.nusiz1 = data,                // NUSIZ1
-            0x06 => self.color_p0 = data,              // COLUP0
-            0x07 => self.color_p1 = data,              // COLUP1
-            0x08 => self.color_pf = data,              // COLUPF
-            0x09 => self.color_bg = data,              // COLUBK
-            0x0A => self.ctrlpf = data,                // CTRLPF
-            0x0B => self.refp0 = (data & 0x08) != 0,   // REFP0
-            0x0C => self.refp1 = (data & 0x08) != 0,   // REFP1
-            0x0D => self.pf0 = data,                   // PF0
-            0x0E => self.pf1 = data,                   // PF1
-            0x0F => self.pf2 = data,                   // PF2
-            0x10 => self.pos_p0 = self.y,              // RESP0 (Simplified)
-            0x11 => self.pos_p1 = self.y,              // RESP1
-            0x12 => self.pos_m0 = self.y,              // RESM0
-            0x13 => self.pos_m1 = self.y,              // RESM1
-            0x14 => self.pos_bl = self.y,              // RESBL
-            0x15 => self.audc0 = data,                 // AUDC0
-            0x16 => self.audc1 = data,                 // AUDC1
-            0x17 => self.audf0 = data,                 // AUDF0
-            0x18 => self.audf1 = data,                 // AUDF1
-            0x19 => self.audv0 = data,                 // AUDV0
-            0x1A => self.audv1 = data,                 // AUDV1
-            0x1B => self.grp0 = data,                  // GRP0
-            0x1C => self.grp1 = data,                  // GRP1
-            0x1D => self.enam0 = (data & 0x02) != 0,   // ENAM0
-            0x1E => self.enam1 = (data & 0x02) != 0,   // ENAM1
-            0x1F => self.enabl = (data & 0x02) != 0,   // ENABL
-            0x20 => self.hmp0 = data,                  // HMP0
-            0x21 => self.hmp1 = data,                  // HMP1
-            0x22 => self.hmm0 = data,                  // HMM0
-            0x23 => self.hmm1 = data,                  // HMM1
-            0x24 => self.hmbl = data,                  // HMBL
-            0x25 => self.vdelp0 = (data & 0x01) != 0,  // VDELP0
-            0x26 => self.vdelp1 = (data & 0x01) != 0,  // VDELP1
-            0x27 => self.vdelbl = (data & 0x01) != 0,  // VDELBL
+            0x00 => self.vsync = ((data & 0x02) != 0),  // VSYNC
+            0x01 => self.vblank = ((data & 0x02) != 0), // VBLANK
+            0x02 => {},                                 // WSYNC (TODO: Sync CPU to HBLANK)
+            0x05 => self.nusiz1 = data,                 // NUSIZ1
+            0x06 => self.color_p0 = data,               // COLUP0
+            0x07 => self.color_p1 = data,               // COLUP1
+            0x08 => self.color_pf = data,               // COLUPF
+            0x09 => self.color_bg = data,               // COLUBK
+            0x0A => self.ctrlpf = data,                 // CTRLPF
+            0x0B => self.refp0 = ((data & 0x08) != 0),  // REFP0
+            0x0C => self.refp1 = ((data & 0x08) != 0),  // REFP1
+            0x0D => self.pf0 = data,                    // PF0
+            0x0E => self.pf1 = data,                    // PF1
+            0x0F => self.pf2 = data,                    // PF2
+            0x10 => self.pos_p0 = self.y,               // RESP0
+            0x11 => self.pos_p1 = self.y,               // RESP1
+            0x12 => self.pos_m0 = self.y,               // RESM0
+            0x13 => self.pos_m1 = self.y,               // RESM1
+            0x14 => self.pos_bl = self.y,               // RESBL
+            0x15 => self.audc0 = data,                  // AUDC0
+            0x16 => self.audc1 = data,                  // AUDC1
+            0x17 => self.audf0 = data,                  // AUDF0
+            0x18 => self.audf1 = data,                  // AUDF1
+            0x19 => self.audv0 = data,                  // AUDV0
+            0x1A => self.audv1 = data,                  // AUDV1
+            0x1B => self.grp0 = data,                   // GRP0
+            0x1C => self.grp1 = data,                   // GRP1
+            0x1D => self.enam0 = ((data & 0x02) != 0),  // ENAM0
+            0x1E => self.enam1 = ((data & 0x02) != 0),  // ENAM1
+            0x1F => self.enabl = ((data & 0x02) != 0),  // ENABL
+            0x20 => self.hmp0 = data,                   // HMP0
+            0x21 => self.hmp1 = data,                   // HMP1
+            0x22 => self.hmm0 = data,                   // HMM0
+            0x23 => self.hmm1 = data,                   // HMM1
+            0x24 => self.hmbl = data,                   // HMBL
+            0x25 => self.vdelp0 = ((data & 0x01) != 0), // VDELP0
+            0x26 => self.vdelp1 = ((data & 0x01) != 0), // VDELP1
+            0x27 => self.vdelbl = ((data & 0x01) != 0), // VDELBL
             0x28 => if ((data & 0x02) != 0) { self.pos_m0 = self.pos_p0; }, // RESMP0
             0x29 => if ((data & 0x02) != 0) { self.pos_m1 = self.pos_p1; }, // RESMP1
             0x2A => {}, // HMOVE (TODO: Apply motion)
@@ -227,7 +227,7 @@ pub const TIA = struct {
             0x05 => return self.cxm1fb,   // CXM1FB
             0x06 => return self.cxblpf,   // CXBLPF
             0x07 => return self.cxppmm,   // CXPPMM
-            0x08 => return 0,             // INPT0 (TODO: Paddle input)
+            0x08 => return 0,             // INPT0
             0x09 => return 0,             // INPT1
             0x0A => return 0,             // INPT2
             0x0B => return 0,             // INPT3
