@@ -12,17 +12,15 @@ const NegativeFlag: u8     = 0b10000000; // Bit 7
 
 pub const CPU = struct {
     alloc: std.mem.Allocator,
-    a: u8,      // Accumulator
-    x: u8,      // X register
-    y: u8,      // Y register
-    sp: u8,     // Stack pointer
-    pc: u16,    // Program counter
-    status: u8, // Status flags
-
-    bus: *BUS,
-
-    opcode: u16,  // Current OPCode
-    cycles: u32,  // Cycles counter
+    a: u8,       // Accumulator
+    x: u8,       // X register
+    y: u8,       // Y register
+    sp: u8,      // Stack pointer
+    pc: u16,     // Program counter
+    status: u8,  // Status flags
+    bus: *BUS,   // Bus object
+    opcode: u16, // Current OPCode
+    cycles: u32, // Cycles counter
     empty_cycles: u32, // Cycles to sleep as if we're busy
 
     const Self = @This();
@@ -119,47 +117,45 @@ pub const CPU = struct {
         self.cycles +%= c;
     }
 
-    // --- Addressing Mode Helpers ---
-
-    fn getImmediate(self: *Self) u8 {
+    pub fn getImmediate(self: *Self) u8 {
         const value = self.bus.read(self.pc);
         self.pcIncrement(1);
         return value;
     }
 
-    fn getZeroPageAddr(self: *Self) u8 {
+    pub fn getZeroPageAddr(self: *Self) u8 {
         return self.getByte();
     }
 
-    fn getZeroPageXAddr(self: *Self) u8 {
+    pub fn getZeroPageXAddr(self: *Self) u8 {
         const zp_addr = self.getByte();
         return (zp_addr +% self.x) & 0xFF;
     }
 
-    fn getZeroPageYAddr(self: *Self) u8 {
+    pub fn getZeroPageYAddr(self: *Self) u8 {
         const zp_addr = self.getByte();
         return (zp_addr +% self.y) & 0xFF;
     }
 
-    fn getAbsoluteAddr(self: *Self) u16 {
+    pub fn getAbsoluteAddr(self: *Self) u16 {
         return self.getWord();
     }
 
-    fn getAbsoluteXAddr(self: *Self) struct { addr: u16, crossed: bool } {
+    pub fn getAbsoluteXAddr(self: *Self) struct { addr: u16, crossed: bool } {
         const base_addr = self.getWord();
         const effective_addr = base_addr +% @as(u16, self.x);
         const crossed = (base_addr & 0xFF00) != (effective_addr & 0xFF00);
         return .{ .addr = effective_addr, .crossed = crossed };
     }
 
-    fn getAbsoluteYAddr(self: *Self) struct { addr: u16, crossed: bool } {
+    pub fn getAbsoluteYAddr(self: *Self) struct { addr: u16, crossed: bool } {
         const base_addr = self.getWord();
         const effective_addr = base_addr +% @as(u16, self.y);
         const crossed = (base_addr & 0xFF00) != (effective_addr & 0xFF00);
         return .{ .addr = effective_addr, .crossed = crossed };
     }
 
-    fn getIndirectXAddr(self: *Self) u16 {
+    pub fn getIndirectXAddr(self: *Self) u16 {
         const zp_addr = self.getByte();
         const effective_zp = (zp_addr +% self.x) & 0xFF;
         const low = self.bus.read(effective_zp);
@@ -167,7 +163,7 @@ pub const CPU = struct {
         return (@as(u16, high) << 8) | low;
     }
 
-    fn getIndirectYAddr(self: *Self) struct { addr: u16, crossed: bool } {
+    pub fn getIndirectYAddr(self: *Self) struct { addr: u16, crossed: bool } {
         const zp_addr = self.getByte();
         const low = self.bus.read(zp_addr);
         const high = self.bus.read((zp_addr +% 1) & 0xFF);
@@ -177,28 +173,26 @@ pub const CPU = struct {
         return .{ .addr = effective_addr, .crossed = crossed };
     }
 
-    fn pageCrossed(addr1: u16, addr2: u16) u8 {
+    pub fn pageCrossed(addr1: u16, addr2: u16) u8 {
         return if ((addr1 & 0xFF00) != (addr2 & 0xFF00)) 1 else 0;
     }
 
-    // --- Operation Helpers ---
-
-    fn ora(self: *Self, value: u8) void {
+    pub fn ora(self: *Self, value: u8) void {
         self.a |= value;
         self.setZeroNegative(self.a);
     }
 
-    fn cand(self: *Self, value: u8) void {
+    pub fn cand(self: *Self, value: u8) void {
         self.a &= value;
         self.setZeroNegative(self.a);
     }
 
-    fn eor(self: *Self, value: u8) void {
+    pub fn eor(self: *Self, value: u8) void {
         self.a ^= value;
         self.setZeroNegative(self.a);
     }
 
-    fn adc(self: *Self, operand: u8) void {
+    pub fn adc(self: *Self, operand: u8) void {
         const carry = (self.status & CarryFlag) != 0;
         const a = self.a;
         const carry_val: u8 = if (carry) 1 else 0;
@@ -209,7 +203,7 @@ pub const CPU = struct {
         self.overflowBit(((a ^ result) & (operand ^ result) & 0x80) != 0);
     }
 
-    fn sbc(self: *Self, operand: u8) void {
+    pub fn sbc(self: *Self, operand: u8) void {
         const carry = (self.status & CarryFlag) != 0;
         const a = self.a;
         const borrow: u8 = if (carry) 0 else 1;
@@ -220,25 +214,25 @@ pub const CPU = struct {
         self.overflowBit(((a ^ result) & (a ^ operand) & 0x80) != 0);
     }
 
-    fn cmp(self: *Self, value: u8) void {
+    pub fn cmp(self: *Self, value: u8) void {
         const result = self.a -% value;
         self.carryBit(self.a >= value);
         self.setZeroNegative(result);
     }
 
-    fn cpx(self: *Self, value: u8) void {
+    pub fn cpx(self: *Self, value: u8) void {
         const result = self.x -% value;
         self.carryBit(self.x >= value);
         self.setZeroNegative(result);
     }
 
-    fn cpy(self: *Self, value: u8) void {
+    pub fn cpy(self: *Self, value: u8) void {
         const result = self.y -% value;
         self.carryBit(self.y >= value);
         self.setZeroNegative(result);
     }
 
-    fn aslMem(self: *Self, addr: u16) void {
+    pub fn aslMem(self: *Self, addr: u16) void {
         const value = self.bus.read(addr);
         const carry_out = (value & 0x80) != 0;
         const result = value << 1;
@@ -247,14 +241,14 @@ pub const CPU = struct {
         self.setZeroNegative(result);
     }
 
-    fn aslA(self: *Self) void {
+    pub fn aslA(self: *Self) void {
         const carry = (self.a & 0x80) != 0;
         self.a <<= 1;
         self.carryBit(carry);
         self.setZeroNegative(self.a);
     }
 
-    fn lsrMem(self: *Self, addr: u16) void {
+    pub fn lsrMem(self: *Self, addr: u16) void {
         const value = self.bus.read(addr);
         const carry_out = (value & 0x01) != 0;
         const result = value >> 1;
@@ -264,7 +258,7 @@ pub const CPU = struct {
         self.negativeBit(false);
     }
 
-    fn lsrA(self: *Self) void {
+    pub fn lsrA(self: *Self) void {
         const carry_out = (self.a & 0x01) != 0;
         self.a >>= 1;
         self.carryBit(carry_out);
@@ -272,7 +266,7 @@ pub const CPU = struct {
         self.negativeBit(false);
     }
 
-    fn rolMem(self: *Self, addr: u16) void {
+    pub fn rolMem(self: *Self, addr: u16) void {
         const value = self.bus.read(addr);
         const carry_in = (self.status & CarryFlag) != 0;
         const carry_out = (value & 0x80) != 0;
@@ -283,7 +277,7 @@ pub const CPU = struct {
         self.setZeroNegative(result);
     }
 
-    fn rolA(self: *Self) void {
+    pub fn rolA(self: *Self) void {
         const carry_in = (self.status & CarryFlag) != 0;
         const carry_out = (self.a & 0x80) != 0;
         const carry_bit: u8 = if (carry_in) 1 else 0;
@@ -292,7 +286,7 @@ pub const CPU = struct {
         self.setZeroNegative(self.a);
     }
 
-    fn rorMem(self: *Self, addr: u16) void {
+    pub fn rorMem(self: *Self, addr: u16) void {
         const value = self.bus.read(addr);
         const carry_in = (self.status & CarryFlag) != 0;
         const carry_out = (value & 0x01) != 0;
@@ -303,7 +297,7 @@ pub const CPU = struct {
         self.setZeroNegative(result);
     }
 
-    fn rorA(self: *Self) void {
+    pub fn rorA(self: *Self) void {
         const carry_in = (self.status & CarryFlag) != 0;
         const carry_out = (self.a & 0x01) != 0;
         const carry_bit: u8 = if (carry_in) 0x80 else 0;
@@ -312,48 +306,48 @@ pub const CPU = struct {
         self.setZeroNegative(self.a);
     }
 
-    fn lda(self: *Self, value: u8) void {
+    pub fn lda(self: *Self, value: u8) void {
         self.a = value;
         self.setZeroNegative(self.a);
     }
 
-    fn ldx(self: *Self, value: u8) void {
+    pub fn ldx(self: *Self, value: u8) void {
         self.x = value;
         self.setZeroNegative(self.x);
     }
 
-    fn ldy(self: *Self, value: u8) void {
+    pub fn ldy(self: *Self, value: u8) void {
         self.y = value;
         self.setZeroNegative(self.y);
     }
 
-    fn sta(self: *Self, addr: u16) void {
+    pub fn sta(self: *Self, addr: u16) void {
         self.bus.write(addr, self.a);
     }
 
-    fn stx(self: *Self, addr: u16) void {
+    pub fn stx(self: *Self, addr: u16) void {
         self.bus.write(addr, self.x);
     }
 
-    fn sty(self: *Self, addr: u16) void {
+    pub fn sty(self: *Self, addr: u16) void {
         self.bus.write(addr, self.y);
     }
 
-    fn decMem(self: *Self, addr: u16) void {
+    pub fn decMem(self: *Self, addr: u16) void {
         const value = self.bus.read(addr);
         const result = value -% 1;
         self.bus.write(addr, result);
         self.setZeroNegative(result);
     }
 
-    fn incMem(self: *Self, addr: u16) void {
+    pub fn incMem(self: *Self, addr: u16) void {
         const value = self.bus.read(addr);
         const result = value +% 1;
         self.bus.write(addr, result);
         self.setZeroNegative(result);
     }
 
-    fn branchIf(self: *Self, condition: bool) void {
+    pub fn branchIf(self: *Self, condition: bool) void {
         const offset: i8 = @bitCast(self.getByte());
         if (condition) {
             const old_pc = self.pc;
@@ -363,8 +357,6 @@ pub const CPU = struct {
             self.empty_cycles = 1;
         }
     }
-
-    // --- Main Cycle Function ---
 
     pub fn cycle(self: *Self) void {
         self.cycleIncrement(1);
@@ -1182,3 +1174,4 @@ pub const CPU = struct {
         }
     }
 };
+
