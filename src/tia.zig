@@ -95,6 +95,8 @@ pub const TIA = struct {
 
     cycles: u32,  // TIA cycles
 
+    const Self = @This();
+
     pub fn init(allocator: std.mem.Allocator) !TIA {
         return TIA{
             .allocator = allocator,
@@ -153,7 +155,7 @@ pub const TIA = struct {
     // pub fn deinit(self: *TIA) void {
     // }
 
-    pub fn write(self: *TIA, address: u16, data: u8) void {
+    pub fn write(self: *Self, address: u16, data: u8) void {
         switch (address) {
             0x00 => self.vsync = ((data & 0x02) != 0),  // VSYNC
             0x01 => self.vblank = ((data & 0x02) != 0), // VBLANK
@@ -195,7 +197,13 @@ pub const TIA = struct {
             0x27 => self.vdelbl = ((data & 0x01) != 0), // VDELBL
             0x28 => if ((data & 0x02) != 0) { self.pos_m0 = self.pos_p0; }, // RESMP0
             0x29 => if ((data & 0x02) != 0) { self.pos_m1 = self.pos_p1; }, // RESMP1
-            0x2A => {}, // HMOVE (TODO: Apply motion)
+            0x2A => {   // HMOVE (TODO: verify)
+                self.pos_p0 += self.hmp0;
+                self.pos_p1 += self.hmp1;
+                self.pos_m0 += self.hmm0;
+                self.pos_m1 += self.hmm1;
+                self.pos_bl += self.hmbl;
+            },
             0x2B => {   // HMCLR
                 self.hmp0 = 0;
                 self.hmp1 = 0;
@@ -217,7 +225,7 @@ pub const TIA = struct {
         }
     }
 
-    pub fn read(self: *TIA, address: u16) u8 {
+    pub fn read(self: *Self, address: u16) u8 {
         switch (address) {
             0x00 => return self.cxm0p,    // CXM0P
             0x01 => return self.cxm1p,    // CXM1P
@@ -235,6 +243,14 @@ pub const TIA = struct {
             0x0D => return 0,             // INPT5
             else => return 0,             // Default for unmapped reads
         }
+    }
+
+    pub fn increment(self: *Self) void {
+        self.cycles +%= 1;
+    }
+
+    pub fn tick(self: *Self) !void {
+       self.increment();
     }
 
     // pub fn inScreen(self: *TIA) !u8 {
