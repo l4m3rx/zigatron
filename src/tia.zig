@@ -33,6 +33,8 @@ const std = @import("std");
 
 pub const TIA = struct {
     allocator: std.mem.Allocator,
+    // Framebuffer
+    framebuffer: []u8,
     // Color Registers (7-bit values, but stored as u8 for simplicity)
     color_p0: u8,  // COLUP0: Color for Player 0
     color_p1: u8,  // COLUP1: Color for Player 1
@@ -98,8 +100,10 @@ pub const TIA = struct {
     const Self = @This();
 
     pub fn init(allocator: std.mem.Allocator) !TIA {
+        const fb = try allocator.alloc(u8, 192*160); // 192x160px
         return TIA{
             .allocator = allocator,
+            .framebuffer = fb,
             .color_p0 = 0,
             .color_p1 = 0,
             .color_pf = 0,
@@ -152,12 +156,13 @@ pub const TIA = struct {
         };
     }
 
-    // pub fn deinit(self: *TIA) void {
-    // }
+    pub fn deinit(self: *Self) void {
+        self.allocator.free(self.framebuffer);
+    }
 
     pub fn write(self: *Self, address: u16, data: u8) void {
         switch (address) {
-            0x00 => self.vsync = ((data & 0x02) != 0),  // VSYNC
+            0x00 => self.vsync =  ((data & 0x02) != 0), // VSYNC
             0x01 => self.vblank = ((data & 0x02) != 0), // VBLANK
             0x02 => {},                                 // WSYNC (TODO: Sync CPU to HBLANK)
             0x05 => self.nusiz1 = data,                 // NUSIZ1
@@ -197,7 +202,7 @@ pub const TIA = struct {
             0x27 => self.vdelbl = ((data & 0x01) != 0), // VDELBL
             0x28 => if ((data & 0x02) != 0) { self.pos_m0 = self.pos_p0; }, // RESMP0
             0x29 => if ((data & 0x02) != 0) { self.pos_m1 = self.pos_p1; }, // RESMP1
-            0x2A => {   // HMOVE (TODO: verify)
+            0x2A => {   // HMOVE (TODO: verify, colision check?)
                 self.pos_p0 += self.hmp0;
                 self.pos_p1 += self.hmp1;
                 self.pos_m0 += self.hmm0;
@@ -221,27 +226,27 @@ pub const TIA = struct {
                 self.cxblpf = 0;
                 self.cxppmm = 0;
             },
-            else => {}, // TODO: handle bad place
+            else => { std.debug.print("[E] TIA: Bad Write address 0x{X}\n", .{address}); },
         }
     }
 
     pub fn read(self: *Self, address: u16) u8 {
         switch (address) {
-            0x00 => return self.cxm0p,    // CXM0P
-            0x01 => return self.cxm1p,    // CXM1P
-            0x02 => return self.cxp0fb,   // CXP0FB
-            0x03 => return self.cxp1fb,   // CXP1FB
-            0x04 => return self.cxm0fb,   // CXM0FB
-            0x05 => return self.cxm1fb,   // CXM1FB
-            0x06 => return self.cxblpf,   // CXBLPF
-            0x07 => return self.cxppmm,   // CXPPMM
-            0x08 => return 0,             // INPT0
-            0x09 => return 0,             // INPT1
-            0x0A => return 0,             // INPT2
-            0x0B => return 0,             // INPT3
-            0x0C => return 0,             // INPT4 (Joystick fire)
-            0x0D => return 0,             // INPT5
-            else => return 0,             // Default for unmapped reads
+            0x00 => return self.cxm0p,  // CXM0P
+            0x01 => return self.cxm1p,  // CXM1P
+            0x02 => return self.cxp0fb, // CXP0FB
+            0x03 => return self.cxp1fb, // CXP1FB
+            0x04 => return self.cxm0fb, // CXM0FB
+            0x05 => return self.cxm1fb, // CXM1FB
+            0x06 => return self.cxblpf, // CXBLPF
+            0x07 => return self.cxppmm, // CXPPMM
+            0x08 => return 0,           // INPT0
+            0x09 => return 0,           // INPT1
+            0x0A => return 0,           // INPT2
+            0x0B => return 0,           // INPT3
+            0x0C => return 0,           // INPT4 (Joystick fire)
+            0x0D => return 0,           // INPT5
+            else => return 0,           // Default for unmapped reads
         }
     }
 

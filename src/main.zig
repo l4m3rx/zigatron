@@ -16,7 +16,7 @@ pub fn main() !void {
     defer riot.deinit();
 
     var tia = try TIA.init(allocator);
-    // defer tia.deinit();
+    defer tia.deinit();
 
     var cart = try CAR.Cartridge.init(allocator);
     defer cart.deinit();
