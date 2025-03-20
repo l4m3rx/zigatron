@@ -1,6 +1,9 @@
 # zigatron
 Zig Atari 2600 (VCS) Emulator
 
+Small project, mostly to learn zig.
+
+Current state:
 
 |      | Description       |    Ready     |     Not ready   |
 | ---- | ----------------- | ------------ | --------------- |
