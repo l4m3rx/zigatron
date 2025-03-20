@@ -2,8 +2,8 @@ const std = @import("std");
 const CPU = @import("cpu.zig").CPU;
 const BUS = @import("bus.zig").BUS;
 const TIA = @import("tia.zig").TIA;
-const CAR = @import("cartridge.zig");
 const RIOT = @import("riot.zig").RIOT;
+const CAR = @import("cartridge.zig").Cartridge;
 
 
 pub fn main() !void {
@@ -18,7 +18,7 @@ pub fn main() !void {
     var tia = try TIA.init(allocator);
     defer tia.deinit();
 
-    var cart = try CAR.Cartridge.init(allocator);
+    var cart = try CAR.init(allocator);
     defer cart.deinit();
     try cart.load("game.bin");
 
