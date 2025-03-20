@@ -12,6 +12,18 @@ pub fn main() !void {
 
     const allocator = arena.allocator();
 
+    // Get command line arguments
+    const args = try std.process.argsAlloc(allocator);
+    defer std.process.argsFree(allocator, args);
+
+    // Check if filename argument is provided
+    if (args.len < 2) {
+        std.debug.print("Usage: {s} <game_file.a26>\n", .{args[0]});
+        return error.MissingArgument;
+    }
+
+    const game_file = args[1];
+
     var riot = try RIOT.init(allocator);
     defer riot.deinit();
 
@@ -20,7 +32,7 @@ pub fn main() !void {
 
     var cart = try CAR.init(allocator);
     defer cart.deinit();
-    try cart.load("game.bin");
+    try cart.load(game_file);
 
     var bus = try BUS.init(allocator, &cart, &riot, &tia);
     defer bus.deinit();

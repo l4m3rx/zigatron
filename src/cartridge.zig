@@ -164,11 +164,11 @@ pub const Cartridge = struct {
     // Basic cartridge info
     pub fn printInfo(self: Self) void {
         std.debug.print("[I] Cartridge:\n", .{});
-        std.debug.print("\tType:         {}\n", .{self.type});
+        // std.debug.print("\tType:         {}\n", .{self.type});
         std.debug.print("\tSize:         {} bytes\n", .{self.size});
         std.debug.print("\tNMI Vector:   0x{X:0>4}\n", .{self.nmi});
         std.debug.print("\tReset Vector: 0x{X:0>4}\n", .{self.reset});
         std.debug.print("\tEntry Point:  0x{X:0>4}\n", .{self.entry});
-        std.debug.print("\tSignature :   0x{X:0>4}\n", .{self.header.signature});
+        // std.debug.print("\tSignature :   0x{X:0>4}\n", .{self.header.signature});
     }
 };
