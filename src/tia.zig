@@ -208,6 +208,16 @@ pub const TIA = struct {
                 self.pos_m0 += self.hmm0;
                 self.pos_m1 += self.hmm1;
                 self.pos_bl += self.hmbl;
+                // while (self.pos_p0 < 68)  self.pos_p0 += 160;
+                // while (self.pos_p0 > 228) self.pos_p0 -= 160;
+                // while (self.pos_p1 < 68)  self.pos_p1 += 160;
+                // while (self.pos_p1 > 228) self.pos_p1 -= 160;
+                // while (self.pos_m0 < 68)  self.pos_m0 += 160;
+                // while (self.pos_m0 > 228) self.pos_m0 -= 160;
+                // while (self.pos_m1 < 68)  self.pos_m1 += 160;
+                // while (self.pos_m1 > 228) self.pos_m1 -= 160;
+                // while (self.pos_bl < 68)  self.pos_bl += 160;
+                // while (self.pos_bl > 228) self.pos_bl -= 160;
             },
             0x2B => {   // HMCLR
                 self.hmp0 = 0;
@@ -244,8 +254,8 @@ pub const TIA = struct {
             0x09 => return 0,           // INPT1
             0x0A => return 0,           // INPT2
             0x0B => return 0,           // INPT3
-            0x0C => return 0,           // INPT4 (Joystick fire)
-            0x0D => return 0,           // INPT5
+            0x0C => return 0x80,        // INPT4
+            0x0D => return 0x80,        // INPT5
             else => return 0,           // Default for unmapped reads
         }
     }

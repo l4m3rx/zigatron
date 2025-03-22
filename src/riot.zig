@@ -7,12 +7,16 @@ pub const RIOT = struct {
     interval: u16,      // Countdown interval (1, 8, 64, or 1024)
     timer_counter: u16, // Counts cycles until the interval is reached
     pram: []u8,
+    swcha: u8,
+    swchb: u8,
 
     pub fn init(allocator: std.mem.Allocator) !RIOT {
         const pram = try allocator.alloc(u8, 128);
         return RIOT{
             .allocator = allocator,
             .pram = pram,
+            .swcha = 0xFF,
+            .swchb = 0xFF,
             .cycles = 0,
             .timer = 0,
             .interval = 1,
@@ -43,12 +47,16 @@ pub const RIOT = struct {
         if (address >= 0x80 and address <= 0xFF) {
             std.debug.print("[D] RAM Read: 0x{X}\n", .{address});
             return self.pram[address - 0x80];
+        } else if (address == 0x280) {
+            return self.swcha;
+        } else if (address == 0x282) {
+            return self.swchb;
         } else if (address == 0x284) { // INTIM: Timer read register
             std.debug.print("[D] Timer Value: {}\n", .{self.timer});
             return self.timer;
         } else {
             std.debug.print("[W] Unhandled RIOT read: 0x{X}\n", .{address});
-            return 0;
+            return 0xFF;
         }
     }
 
@@ -81,7 +89,7 @@ pub const RIOT = struct {
         self.cycles +%= 1;
         self.timer_counter +%= 1;
         if (self.timer_counter >= self.interval) {
-            self.timer -%= 1; // Wrapping subtract for u8
+            self.timer -%= 1;
             self.timer_counter = 0;
         }
     }
