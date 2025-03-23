@@ -69,9 +69,11 @@ pub const RIOT = struct {
             std.debug.print("[D] Timer Value: {}\n", .{self.timer});
             return self.timer;
         } else if (address == 0x285) { // TIMINT: Timer interrupt flag
-            const flag = if (self.timer_flag) 0x80 else 0x00;
             self.timer_flag = false; // Reading clears the flag
-            return flag;
+            if (self.timer_flag)
+                return 0x80
+            else
+                return 0x00;
         } else {
             std.debug.print("[W] Unhandled RIOT read: 0x{X}\n", .{address});
             return 0xFF;
