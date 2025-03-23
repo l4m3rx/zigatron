@@ -265,7 +265,25 @@ pub const TIA = struct {
     }
 
     pub fn tick(self: *Self) !void {
-       self.increment();
+        self.cycles +%= 1;
+        self.x +%= 1;
+        if (self.x == 228) {
+            self.x = 0;
+            self.y +%= 1;
+            if (self.y == 262) {
+                self.y = 0;
+                // TODO: Signal end of frame
+            }
+        }
+        // Render during visible area: x = 68–227, when not in vblank
+        if (!self.vblank and self.x >= 68 and self.x < 228) {
+            const pixel_x = self.x - 68; // 0–159 in visible range
+            // For now, limit to 192 scanlines (adjustable later)
+            if (self.y < 192) {
+                const index = self.y * 160 + pixel_x;
+                self.framebuffer[index] = self.color_bg; // Start with background color
+            }
+        }
     }
 
     // pub fn inScreen(self: *TIA) !u8 {
