@@ -91,8 +91,13 @@ pub const RIOT = struct {
         self.cycles +%= 1;
         self.timer_counter +%= 1;
         if (self.timer_counter >= self.interval) {
+            const old_timer = self.timer;
             self.timer -%= 1;
+            if (old_timer == 0) {
+                self.timer_flag = true;
+            }
             self.timer_counter = 0;
         }
     }
+
 };
