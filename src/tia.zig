@@ -284,9 +284,9 @@ pub const TIA = struct {
                            self.pf2; // Bits 12-19 from PF2 (bits 0-7)
         // Calculate the shift amount for the selected register, ensuring it's a u3 type
         const shift: u3 = if (bit_pos < 4)
-                              @intCast(4 + bit_pos) // PF0: bit 4 to 7
+                              @intCast(4 + bit_pos)   // PF0: bit 4 to 7
                           else if (bit_pos < 12)
-                              @intCast(11 - bit_pos) // PF1: bit 7 to 0 (reversed)
+                              @intCast(11 - bit_pos)  // PF1: bit 7 to 0 (reversed)
                           else
                               @intCast(bit_pos - 12); // PF2: bit 0 to 7
         // Extract the bit and return whether it's set
@@ -311,16 +311,13 @@ pub const TIA = struct {
             if (self.y < 192) {
                 const index = self.y * 160 + pixel_x;
                 var color = self.color_bg;
-                if (self.getPlayfieldBit(pixel_x)) {
+                if (self.getPlayfieldBit(pixel_x))
                     color = self.color_pf;
-                }
                 // Player 0: 8 pixels wide starting at pos_p0
                 if (self.x >= self.pos_p0 and self.x < self.pos_p0 + 8) {
-                    const bit = 7 - (self.x - self.pos_p0); // Bit 7 is leftmost
-                    if ((self.grp0 >> @intCast(bit)) & 1 != 0) {
-                    // if ((self.grp0 >> bit) & 1 != 0) {
+                    const bit = 7 - (self.x - self.pos_p0);
+                    if ((self.grp0 >> @intCast(bit)) & 1 != 0)
                         color = self.color_p0;
-                    }
                 }
                 self.framebuffer[index] = color;
             }
