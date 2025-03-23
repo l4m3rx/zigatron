@@ -176,11 +176,11 @@ pub const TIA = struct {
             0x0D => self.pf0 = data,                    // PF0
             0x0E => self.pf1 = data,                    // PF1
             0x0F => self.pf2 = data,                    // PF2
-            0x10 => self.pos_p0 = self.y,               // RESP0
-            0x11 => self.pos_p1 = self.y,               // RESP1
-            0x12 => self.pos_m0 = self.y,               // RESM0
-            0x13 => self.pos_m1 = self.y,               // RESM1
-            0x14 => self.pos_bl = self.y,               // RESBL
+            0x10 => self.pos_p0 = @intCast(self.x),     // RESP0: Set to current horizontal position
+            0x11 => self.pos_p1 = @intCast(self.x),     // RESP1
+            0x12 => self.pos_m0 = @intCast(self.x),     // RESM0
+            0x13 => self.pos_m1 = @intCast(self.x),     // RESM1
+            0x14 => self.pos_bl = @intCast(self.x),     // RESBL
             0x15 => self.audc0 = data,                  // AUDC0
             0x16 => self.audc1 = data,                  // AUDC1
             0x17 => self.audf0 = data,                  // AUDF0
