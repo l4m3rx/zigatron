@@ -50,6 +50,7 @@ pub fn main() !void {
     // std.debug.print("|{}|\n", .{a});
 
     while (true) {
+        try tia.tick();
         cpu.cycle();
         riot.cycle();
         // std.time.sleep(100*100*100);

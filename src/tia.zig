@@ -265,16 +265,32 @@ pub const TIA = struct {
     }
 
     fn getPlayfieldBit(self: *Self, pixel_x: u8) bool {
-        const pf_index = pixel_x / 4; // 0–39 (40 pixels total)
+        const pf_index = pixel_x / 4; // Calc playfield index
+        // Determine if the pixel is in the right half of the screen
         const is_right_half = pf_index >= 20;
-        const bit_pos = if (!is_right_half) pf_index // Left half: 0–19
-                       else if (self.ctrlpf & 0x01 == 0) pf_index - 20 // Right half, repeated
-                       else 39 - pf_index; // Right half, reflected
-        // Extract the bit from pf0, pf1, or pf2
-        const pf_reg = if (bit_pos < 4) self.pf0 else if (bit_pos < 12) self.pf1 else self.pf2;
-        const bit = if (bit_pos < 4) (pf_reg >> (4 + bit_pos)) & 1 // PF0: bits 4–7
-                   else if (bit_pos < 12) (pf_reg >> (11 - bit_pos)) & 1 // PF1: bits 7–0
-                   else (pf_reg >> (bit_pos - 12)) & 1; // PF2: bits 0–7
+        // Compute the playfield bit position (0 to 19)
+        const bit_pos = if (!is_right_half)
+                            pf_index // Left half: direct mapping
+                        else if (self.ctrlpf & 0x01 == 0)
+                            pf_index - 20 // Right half, repeat mode
+                        else
+                            39 - pf_index; // Right half, reflect mode
+        // Select the appropriate playfield register based on bit position
+        const pf_reg = if (bit_pos < 4)
+                           self.pf0 // Bits 0-3 from PF0 (bits 4-7)
+                       else if (bit_pos < 12)
+                           self.pf1 // Bits 4-11 from PF1 (bits 7-0, reversed)
+                       else
+                           self.pf2; // Bits 12-19 from PF2 (bits 0-7)
+        // Calculate the shift amount for the selected register, ensuring it's a u3 type
+        const shift: u3 = if (bit_pos < 4)
+                              @intCast(4 + bit_pos) // PF0: bit 4 to 7
+                          else if (bit_pos < 12)
+                              @intCast(11 - bit_pos) // PF1: bit 7 to 0 (reversed)
+                          else
+                              @intCast(bit_pos - 12); // PF2: bit 0 to 7
+        // Extract the bit and return whether it's set
+        const bit = (pf_reg >> shift) & 1;
         return bit != 0;
     }
 
@@ -301,7 +317,8 @@ pub const TIA = struct {
                 // Player 0: 8 pixels wide starting at pos_p0
                 if (self.x >= self.pos_p0 and self.x < self.pos_p0 + 8) {
                     const bit = 7 - (self.x - self.pos_p0); // Bit 7 is leftmost
-                    if ((self.grp0 >> bit) & 1 != 0) {
+                    if ((self.grp0 >> @intCast(bit)) & 1 != 0) {
+                    // if ((self.grp0 >> bit) & 1 != 0) {
                         color = self.color_p0;
                     }
                 }
