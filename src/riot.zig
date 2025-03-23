@@ -70,18 +70,22 @@ pub const RIOT = struct {
             self.timer = value;
             self.interval = 1;
             self.timer_counter = 0;
+            self.timer_flag = false;
         } else if (address == 0x295) { // TIM8T: Set timer, count every 8 cycles
             self.timer = value;
             self.interval = 8;
             self.timer_counter = 0;
+            self.timer_flag = false;
         } else if (address == 0x296) { // TIM64T: Set timer, count every 64 cycles
             self.timer = value;
             self.interval = 64;
             self.timer_counter = 0;
+            self.timer_flag = false;
         } else if (address == 0x297) { // TIM1024T: Set timer, count every 1024 cycles
             self.timer = value;
             self.interval = 1024;
             self.timer_counter = 0;
+            self.timer_flag = false;
         } else {
             std.debug.print("[W] Unhandled RIOT write: 0x{X}=0x{X}\n", .{address, value});
         }
