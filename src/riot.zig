@@ -6,6 +6,7 @@ pub const RIOT = struct {
     timer: u8,          // Current timer value
     interval: u16,      // Countdown interval (1, 8, 64, or 1024)
     timer_counter: u16, // Counts cycles until the interval is reached
+    timer_flag: bool,   // Timer underflow flag
     pram: []u8,
     swcha: u8,
     swchb: u8,
@@ -21,6 +22,7 @@ pub const RIOT = struct {
             .timer = 0,
             .interval = 1,
             .timer_counter = 0,
+            .timer_flag = false,
         };
     }
 
