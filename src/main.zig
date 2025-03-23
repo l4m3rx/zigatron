@@ -7,6 +7,7 @@ const CAR = @import("cartridge.zig").Cartridge;
 
 
 pub fn main() !void {
+    var cycles: u32 = 0;
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
 
@@ -50,11 +51,14 @@ pub fn main() !void {
     // std.debug.print("|{}|\n", .{a});
 
     while (true) {
-        try tia.tick();
-        cpu.cycle();
-        riot.cycle();
+        if ((cycles % 3) == 0) {
+            cpu.tick();
+            riot.tick();
+        }
+        tia.tick();
         // std.time.sleep(100*100*100);
         std.time.sleep(100*1000*100_0);
+        cycles +%= 1;
     }
 }
 

@@ -117,7 +117,7 @@ pub const RIOT = struct {
         }
     }
 
-    pub fn cycle(self: *RIOT) void {
+    pub fn tick(self: *RIOT) void {
         self.cycles +%= 1;
         self.timer_counter +%= 1;
         if (self.timer_counter >= self.interval) {

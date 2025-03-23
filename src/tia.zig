@@ -294,7 +294,7 @@ pub const TIA = struct {
         return bit != 0;
     }
 
-    pub fn tick(self: *Self) !void {
+    pub fn tick(self: *Self) void {
         self.cycles +%= 1;
         self.x +%= 1;
         if (self.x == 228) {

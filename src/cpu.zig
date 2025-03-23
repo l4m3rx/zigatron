@@ -358,7 +358,7 @@ pub const CPU = struct {
         }
     }
 
-    pub fn cycle(self: *Self) void {
+    pub fn tick(self: *Self) void {
         self.cycleIncrement(1);
         if (self.empty_cycles > 0) {
             self.empty_cycles -= 1;
