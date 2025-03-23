@@ -7,6 +7,10 @@ pub const RIOT = struct {
     interval: u16,      // Countdown interval (1, 8, 64, or 1024)
     timer_counter: u16, // Counts cycles until the interval is reached
     timer_flag: bool,   // Timer underflow flag
+    porta_out: u8,      // Output latch for Port A (SWCHA)
+    portb_out: u8,      // Output latch for Port B (SWCHB)
+    ddra: u8,           // Data Direction Register A
+    ddrb: u8,           // Data Direction Register B
     pram: []u8,
     swcha: u8,
     swchb: u8,
@@ -15,12 +19,16 @@ pub const RIOT = struct {
         const pram = try allocator.alloc(u8, 128);
         return RIOT{
             .allocator = allocator,
+            .timer = 0,
+            .cycles = 0,
             .pram = pram,
+            .ddra = 0x00,
+            .ddrb = 0x00,
             .swcha = 0xFF,
             .swchb = 0xFF,
-            .cycles = 0,
-            .timer = 0,
             .interval = 1,
+            .porta_out = 0x00,
+            .portb_out = 0x00,
             .timer_counter = 0,
             .timer_flag = false,
         };
@@ -50,9 +58,13 @@ pub const RIOT = struct {
             std.debug.print("[D] RAM Read: 0x{X}\n", .{address});
             return self.pram[address - 0x80];
         } else if (address == 0x280) {
-            return self.swcha;
+            return (self.swcha & ~self.ddra) | (self.porta_out & self.ddra);
+        } else if (address == 0x281) { // SWACNT: DDRA
+            return self.ddra;
         } else if (address == 0x282) {
-            return self.swchb;
+            return (self.swchb & ~self.ddrb) | (self.portb_out & self.ddrb);
+        } else if (address == 0x283) { // SWBCNT: DDRB
+            return self.ddrb;
         } else if (address == 0x284) { // INTIM: Timer read register
             std.debug.print("[D] Timer Value: {}\n", .{self.timer});
             return self.timer;
@@ -70,6 +82,14 @@ pub const RIOT = struct {
         std.debug.print("[D] RIOT Writing: 0x{X}={d}\n", .{address, value});
         if (address >= 0x80 and address <= 0xFF) {
             self.pram[address - 0x80] = value;
+        } else if (address == 0x280) { // SWCHA
+            self.porta_out = value;
+        } else if (address == 0x282) { // SWCHB
+            self.portb_out = value;
+        } else if (address == 0x281) { // SWACNT: DDRA
+            self.ddra = value;
+        } else if (address == 0x283) { // SWBCNT: DDRB
+            self.ddrb = value;
         } else if (address == 0x294) { // TIM1T: Set timer, count every cycle
             self.timer = value;
             self.interval = 1;
