@@ -264,6 +264,20 @@ pub const TIA = struct {
         self.cycles +%= 1;
     }
 
+    fn getPlayfieldBit(self: *Self, pixel_x: u8) bool {
+        const pf_index = pixel_x / 4; // 0–39 (40 pixels total)
+        const is_right_half = pf_index >= 20;
+        const bit_pos = if (!is_right_half) pf_index // Left half: 0–19
+                       else if (self.ctrlpf & 0x01 == 0) pf_index - 20 // Right half, repeated
+                       else 39 - pf_index; // Right half, reflected
+        // Extract the bit from pf0, pf1, or pf2
+        const pf_reg = if (bit_pos < 4) self.pf0 else if (bit_pos < 12) self.pf1 else self.pf2;
+        const bit = if (bit_pos < 4) (pf_reg >> (4 + bit_pos)) & 1 // PF0: bits 4–7
+                   else if (bit_pos < 12) (pf_reg >> (11 - bit_pos)) & 1 // PF1: bits 7–0
+                   else (pf_reg >> (bit_pos - 12)) & 1; // PF2: bits 0–7
+        return bit != 0;
+    }
+
     pub fn tick(self: *Self) !void {
         self.cycles +%= 1;
         self.x +%= 1;
@@ -277,13 +291,24 @@ pub const TIA = struct {
         }
         // Render during visible area: x = 68–227, when not in vblank
         if (!self.vblank and self.x >= 68 and self.x < 228) {
-            const pixel_x = self.x - 68; // 0–159 in visible range
-            // For now, limit to 192 scanlines (adjustable later)
+            const pixel_x = self.x - 68;
             if (self.y < 192) {
                 const index = self.y * 160 + pixel_x;
-                self.framebuffer[index] = self.color_bg; // Start with background color
+                var color = self.color_bg;
+                if (self.getPlayfieldBit(pixel_x)) {
+                    color = self.color_pf;
+                }
+                // Player 0: 8 pixels wide starting at pos_p0
+                if (self.x >= self.pos_p0 and self.x < self.pos_p0 + 8) {
+                    const bit = 7 - (self.x - self.pos_p0); // Bit 7 is leftmost
+                    if ((self.grp0 >> bit) & 1 != 0) {
+                        color = self.color_p0;
+                    }
+                }
+                self.framebuffer[index] = color;
             }
         }
+
     }
 
     // pub fn inScreen(self: *TIA) !u8 {
