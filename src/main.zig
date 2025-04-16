@@ -1,9 +1,6 @@
 const std = @import("std");
 const CPU = @import("cpu.zig").CPU;
 const BUS = @import("bus.zig").BUS;
-const TIA = @import("tia.zig").TIA;
-const RIOT = @import("riot.zig").RIOT;
-const CAR = @import("cartridge.zig").Cartridge;
 
 
 pub fn main() !void {
@@ -18,46 +15,33 @@ pub fn main() !void {
     defer std.process.argsFree(allocator, args);
 
     // Check if filename argument is provided
-    if (args.len < 2) {
-        std.debug.print("Usage: {s} <game_file.a26>\n", .{args[0]});
-        return error.MissingArgument;
-    }
+    // if (args.len < 2) {
+    //     std.debug.print("Usage: {s} <game_file.a26>\n", .{args[0]});
+    //     return error.MissingArgument;
+    // }
+    // const game_file = args[1];
 
-    const game_file = args[1];
-
-    var riot = try RIOT.init(allocator);
-    defer riot.deinit();
-
-    var tia = try TIA.init(allocator);
-    defer tia.deinit();
-
-    var cart = try CAR.init(allocator);
-    defer cart.deinit();
-    try cart.load(game_file);
-
-    var bus = try BUS.init(allocator, &cart, &riot, &tia);
+    var bus = try BUS.init(allocator);
     defer bus.deinit();
 
     var cpu = try CPU.init(allocator, &bus);
     // defer cpu.deinit();
 
-    cart.printInfo();
-    // cart.dumpRom(cart.size);
+    const addressLow = bus.read(0xFFFC);
+    const addressHigh = bus.read(0xFFFD);
+    const entrypoint = @as(u16, addressLow) | (@as(u16, addressHigh) << 8);
 
     bus.reset();
-    cpu.reset(cart.entry);
+    cpu.reset(entrypoint);
+    // cpu.reset(0xFF00);
 
     // const a = bus.readCart(0x8040);
     // std.debug.print("|{}|\n", .{a});
 
     while (true) {
-        if ((cycles % 3) == 0) {
-            cpu.tick();
-            riot.tick();
-        }
-        tia.tick();
-        // std.time.sleep(100*100*100);
-        std.time.sleep(100*1000*100_0);
+        cpu.tick();
+        std.time.sleep(100*100*100);
+        // std.time.sleep(100*1000*100_0);
         cycles +%= 1;
     }
 }

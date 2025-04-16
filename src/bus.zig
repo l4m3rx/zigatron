@@ -1,85 +1,75 @@
 const std = @import("std");
-const TIA = @import("tia.zig").TIA;
-const CAR = @import("cartridge.zig").Cartridge;
-const RIOT = @import("riot.zig").RIOT;
 
+const ram_size  = 0xC000;
+const rom_start = 0xFF00;
+const rom: [256]u8 = .{
+  0xd8, 0x58, 0xa0, 0x7f, 0x8c, 0x12, 0xd0, 0xa9, 0xa7, 0x8d, 0x11, 0xd0, 0x8d, 0x13, 0xd0, 0xc9, 0xdf, 0xf0, 0x13, 0xc9, 0x9b, 0xf0, 0x03, 0xc8, 0x10, 0x0f, 0xa9, 0xdc, 0x20, 0xef, 0xff, 0xa9, 0x8d, 0x20, 0xef, 0xff, 0xa0, 0x01, 0x88, 0x30, 0xf6, 0xad, 0x11, 0xd0, 0x10, 0xfb, 0xad, 0x10, 0xd0, 0x99, 0x00, 0x02, 0x20, 0xef, 0xff, 0xc9, 0x8d, 0xd0, 0xd4, 0xa0, 0xff, 0xa9, 0x00, 0xaa, 0x0a, 0x85, 0x2b, 0xc8, 0xb9, 0x00, 0x02, 0xc9, 0x8d, 0xf0, 0xd4, 0xc9, 0xae, 0x90, 0xf4, 0xf0, 0xf0, 0xc9, 0xba, 0xf0, 0xeb, 0xc9, 0xd2, 0xf0, 0x3b, 0x86, 0x28, 0x86, 0x29, 0x84, 0x2a, 0xb9, 0x00, 0x02, 0x49, 0xb0, 0xc9, 0x0a, 0x90, 0x06, 0x69, 0x88, 0xc9, 0xfa, 0x90, 0x11, 0x0a, 0x0a, 0x0a, 0x0a, 0xa2, 0x04, 0x0a, 0x26, 0x28, 0x26, 0x29, 0xca, 0xd0, 0xf8, 0xc8, 0xd0, 0xe0, 0xc4, 0x2a, 0xf0, 0x97, 0x24, 0x2b, 0x50, 0x10, 0xa5, 0x28, 0x81, 0x26, 0xe6, 0x26, 0xd0, 0xb5, 0xe6, 0x27, 0x4c, 0x44, 0xff, 0x6c, 0x24, 0x00, 0x30, 0x2b, 0xa2, 0x02, 0xb5, 0x27, 0x95, 0x25, 0x95, 0x23, 0xca, 0xd0, 0xf7, 0xd0, 0x14, 0xa9, 0x8d, 0x20, 0xef, 0xff, 0xa5, 0x25, 0x20, 0xdc, 0xff, 0xa5, 0x24, 0x20, 0xdc, 0xff, 0xa9, 0xba, 0x20, 0xef, 0xff, 0xa9, 0xa0, 0x20, 0xef, 0xff, 0xa1, 0x24, 0x20, 0xdc, 0xff, 0x86, 0x2b, 0xa5, 0x24, 0xc5, 0x28, 0xa5, 0x25, 0xe5, 0x29, 0xb0, 0xc1, 0xe6, 0x24, 0xd0, 0x02, 0xe6, 0x25, 0xa5, 0x24, 0x29, 0x07, 0x10, 0xc8, 0x48, 0x4a, 0x4a, 0x4a, 0x4a, 0x20, 0xe5, 0xff, 0x68, 0x29, 0x0f, 0x09, 0xb0, 0xc9, 0xba, 0x90, 0x02, 0x69, 0x06, 0x2c, 0x12, 0xd0, 0x30, 0xfb, 0x8d, 0x12, 0xd0, 0x60, 0x00, 0x00, 0x00, 0x0f, 0x00, 0xff, 0x00, 0x00
+  };
 
 pub const BUS = struct {
     allocator: std.mem.Allocator,
-    tia: *TIA = undefined,
-    car: *CAR = undefined,
-    riot: *RIOT = undefined,
-    bus: []u8,
+    ram: []u8,
+    key: u8,
+    key_rdy: u8,
 
-    pub fn init(allocator: std.mem.Allocator, car: *CAR, riot: *RIOT, tia: *TIA) !BUS {
-        const bus = try allocator.alloc(u8, 1024);
+    pub fn init(allocator: std.mem.Allocator) !BUS {
+        const ram = try allocator.alloc(u8, ram_size);
         return BUS{
             .allocator = allocator,
-            .bus = bus,
-            .tia = tia,
-            .car = car,
-            .riot = riot
+            .ram = ram,
+            .key = 0,
+            .key_rdy = 0
+
         };
     }
 
     pub fn reset(self: *BUS) void {
-        for (self.bus) |*p|
+        self.key_rdy = 0;
+        for (self.ram) |*p|
             p.* = 0;
     }
 
     pub fn deinit(self: *BUS) void {
-        self.allocator.free(self.bus);
+        self.allocator.free(self.ram);
     }
 
     pub fn readStack(self: *BUS, addr: u16) u8 {
-        // std.debug.print("[I] Stack pull \n", .{});
-        return self.bus[addr];
+        return self.ram[addr];
     }
 
     pub fn writeStack(self: *BUS, addr: u16, data: u8) void {
-        // std.debug.print("[I] Stack push {}\n", .{value});
-        self.bus[addr] = data;
+        self.ram[addr] = data;
     }
 
     pub fn read(self: *BUS, addr: u16) u8 {
-        // Extract Relevent Address bits
-        const a7  = (addr & 0b0000_0000_1000_0000) != 0;
-        const a9  = (addr & 0b0000_0010_0000_0000) != 0;
-        const a12 = (addr & 0b0001_0000_0000_0000) != 0;
+        if (addr < ram_size)
+            return self.ram[addr];
+        if (addr >= rom_start)
+            return rom[addr - rom_start];
 
-        if (a12) { // Cartrage memory is selected by A12=1
-            return self.car.read((addr - 0x1000) & 0x0FFF);
-        } else if (a7 and a9) { // RIOT I/O is selected by A12=0, A9=1, A7=1
-            std.debug.print("[D] Timer Read 0x{X}/0x{X}\n", .{addr, addr & 0x02FF});
-            return self.riot.read(addr & 0x02FF);
-        } else if ((!a9) and a7) { // RAM is selected by A12=0, A9=0, A7=1
-            std.debug.print("[D] RAM Read 0x{X}/0x{X}\n", .{addr, addr & 0x7F});
-            return self.riot.readRam(addr & 0x7F);
-        } else { // The TIA chip is addressed by A12=0, A7=0
-            // return 0;
-            return self.tia.read((addr & 0x0F) | 0x30);
+        if (addr == 0xD011) {
+            if (self.key_rdy > 0)
+                return self.key_rdy;
+            return 0;
         }
+        if ((addr == 0xD010) and (self.key_rdy > 0)) {
+            self.key_rdy = 0;
+            return (self.key | 0x80);
+        }
+
+        return 0;
     }
 
-    pub fn write(self: *BUS, addr: u16, data: u8) void {
-        // Extract Relevent Address bits
-        const a7  = (addr & 0b0000_0000_1000_0000) != 0;
-        const a9  = (addr & 0b0000_0010_0000_0000) != 0;
-        const a12 = (addr & 0b0001_0000_0000_0000) != 0;
-
-        if (a12) {
-            // Cartridge space (0x1000–0x1FFF): A12=1
-            // Standard cartridges are read-only (ROM), so writes are ignored
-            // Note: If the cartridge has RAM (e.g., Super Chip), you could add logic like:
-            // if (addr >= 0x1000 and addr <= 0x107F) {
-            //     self.car[addr & 0x7F] = data;
-            // }
-        } else if (!a7) { // TIA registers (0x0000–0x007F): A12=0, A7=0
-            self.tia.write(addr & 0x3F, data);
-        } else if (!a9) { // System RAM (RIOT RAM, 0x0080–0x00FF): A12=0, A7=1, A9=0
-            self.riot.writeRam(addr & 0x7F, data);
-        } else { // RIOT I/O registers (0x0280–0x029F): A12=0, A9=1
-            self.riot.write(addr & 0x1F, data);
+    pub fn write(self: *BUS, addr: u16, value: u8) void {
+        if (addr < ram_size) {
+            self.ram[addr] = value;
+        } else if (addr == 0xD012) {
+            var modifiedValue = value & 0x7F;
+            if (modifiedValue == 0x7F) modifiedValue = '@'
+            else if (modifiedValue == 0x0D) modifiedValue = 0x0A
+            else if (modifiedValue == 0x5F)
+                std.debug.print("{c}{c}{c}", .{0x08, 0x20, 0x08}) // BackSpace, Space, BackSpace
+            else std.debug.print("{c}", .{modifiedValue});
         }
     }
 

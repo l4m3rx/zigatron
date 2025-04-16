@@ -10,6 +10,14 @@ const UnusedFlag: u8       = 0b00100000;
 const OverflowFlag: u8     = 0b01000000;
 const NegativeFlag: u8     = 0b10000000; // Bit 7
 
+const Operand = struct {
+    setAcc: bool,   // 1 byte
+    value: u16,     // 2 bytes
+    address: u16,   // 2 bytes
+};
+
+
+
 pub const CPU = struct {
     alloc: std.mem.Allocator,
     a: u8,       // Accumulator
@@ -17,13 +25,58 @@ pub const CPU = struct {
     y: u8,       // Y register
     sp: u8,      // Stack pointer
     pc: u16,     // Program counter
+    opcode: u8,  // Opcode
     status: u8,  // Status flags
     bus: *BUS,   // Bus object
-    opcode: u16, // Current OPCode
     cycles: u32, // Cycles counter
-    empty_cycles: u32, // Cycles to sleep as if we're busy
+    busy: u8,    // Busy cycles
+    op: Operand,
 
     const Self = @This();
+
+    // // Define function types
+    // const AddressingMode = fn (cpu: *CPU) void;
+    // const Instruction = fn (cpu: *CPU) void;
+    // const PCCycles6502 = fn (cpu: *CPU) void;
+    // const Cycles6502 = fn (cpu: *CPU) void;
+
+    // const cycles6502: [256]Cycles6502 = [_]Cycles6502 {
+    //     0, 6, 0, 0, 0, 3, 5, 0, 3, 2, 2, 0, 0, 4, 6, 0,
+    //     2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0,
+    //     6, 6, 0, 0, 3, 3, 5, 0, 4, 2, 2, 0, 4, 4, 6, 0,
+    //     2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0,
+    //     6, 6, 0, 0, 0, 3, 5, 0, 3, 2, 2, 0, 3, 4, 6, 0,
+    //     2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0,
+    //     6, 6, 0, 0, 0, 3, 5, 0, 4, 2, 2, 0, 5, 4, 6, 0,
+    //     2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0,
+    //     0, 6, 0, 0, 3, 3, 3, 0, 2, 0, 2, 0, 4, 4, 4, 0,
+    //     2, 6, 0, 0, 4, 4, 4, 0, 2, 5, 2, 0, 0, 5, 0, 0,
+    //     2, 6, 2, 0, 3, 3, 3, 0, 2, 2, 2, 0, 4, 4, 4, 0,
+    //     2, 5, 0, 0, 4, 4, 4, 0, 2, 4, 2, 0, 4, 4, 4, 0,
+    //     2, 6, 0, 0, 3, 3, 5, 0, 2, 2, 2, 0, 4, 4, 6, 0,
+    //     2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0,
+    //     2, 6, 0, 0, 3, 3, 5, 0, 2, 2, 2, 0, 4, 4, 6, 0,
+    //     2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0
+    // };
+
+    // const pc_cycles: [256]PCCycles6502 = [_]PCCycles6502 {
+    //     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+    //     1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1,
+    //     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+    //     1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1,
+    //     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+    //     1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1,
+    //     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+    //     1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1,
+    //     1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+    //     1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+    //     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+    //     1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1,
+    //     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+    //     1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1,
+    //     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+    //     1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1
+    // };
 
     pub fn init(alloc: std.mem.Allocator, bus: *BUS) !Self {
         return CPU{
@@ -32,1146 +85,1191 @@ pub const CPU = struct {
             .y = 0,
             .bus = bus,
             .sp = 0xFF,
-            .cycles = 0,
+            .busy = 0,
             .opcode = 0,
+            .cycles = 0,
             .pc = 0xFFFC,
             .status = 0x34,
             .alloc = alloc,
-            .empty_cycles = 0,
+            .op = Operand{ .setAcc = false, .value = 0, .address = 0 }
         };
     }
 
+    // Stack operations
+    pub fn stackPush(self: *Self, value: u8) void {
+        self.bus.write(0x100 + @as(u16, (self.sp - 1)), value);
+    }
+
+    pub fn stackPull(self: *Self) u8 {
+        return self.bus.read(0x100 + @as(u16, (self.sp + 1)));
+    }
+
     pub fn reset(self: *Self, entrypoint: u16) void {
+        self.busy = 0;
         self.sp = 0xFF;
         self.pc = entrypoint;
         self.status = 0x34;
-        self.opcode = 0;
         self.cycles = 0;
-        self.empty_cycles = 0;
+        self.op.setAcc = false;
+        self.op.value = 0;
+        self.op.address = 0;
     }
 
-    pub fn readInstruction(self: *Self) void {
-        self.opcode = self.bus.read(self.pc);
-        std.debug.print("[D] Cycle: {d} OPCode:0x{X} PC:0x{X}\n", .{self.cycles, self.opcode, self.pc});
-        self.pcIncrement(1);
+    fn setSZ(self: *Self, value: u16) void {
+        if ((value & 0x00FF) != 0) self.status &= ~ZeroFlag
+        else self.status |= ~ZeroFlag;
+
+        if ((value & 0x80) != 0) self.status |= ~NegativeFlag
+        else self.status &= ~NegativeFlag;
     }
 
-    pub fn getWord(self: *Self) u16 {
-        const low = self.bus.read(self.pc);
-        self.pcIncrement(1);
-        const high = self.bus.read(self.pc);
-        self.pcIncrement(1);
-        return (@as(u16, high) << 8) | low;
+    // Addressing modes
+    // fn IMP(self: *Self) void { // Implicit
+    // }
+
+    fn ACC(self: *Self) void { // Accumulator
+        self.op.value = self.a;
+        self.op.setAcc = true;
     }
 
-    pub fn getByte(self: *Self) u8 {
-        const byte = self.bus.read(self.pc);
-        self.pcIncrement(1);
-        return byte;
+    fn IMM(self: *Self) void { // IMMediate
+        self.op.address = self.pc + 1;
+        self.op.value = self.bus.read(self.op.address);
     }
 
-    pub fn pushStack(self: *Self, value: u8) void {
-        self.bus.writeStack(0x0100 + @as(u16, self.sp), value);
-        self.sp -%= 1;
+    fn ZPG(self: *Self) void { // Zero page
+        self.op.address = self.bus.read(self.pc + 1);
+        self.op.value = self.bus.read(self.op.address);
     }
 
-    pub fn pullStack(self: *Self) u8 {
-        self.sp +%= 1;
-        return self.bus.readStack(0x0100 + @as(u16, self.sp));
+    fn ZPX(self: *Self) void { // Zero page,X
+        self.op.address = (self.bus.read(self.pc + 1) + self.x) & 0xFF;
+        self.op.value = self.bus.read(self.op.address);
     }
 
-    pub fn setZeroNegative(self: *Self, value: u8) void {
-        self.zeroBit(value == 0);
-        self.negativeBit((value & 0x80) != 0);
+    fn ZPY(self: *Self) void { // Zero page,Y
+        self.op.address = (self.bus.read(self.pc + 1) + self.y) & 0xFF;
+        self.op.value = self.bus.read(self.op.address);
     }
 
-    pub fn interruptBit(self: *Self, b: bool) void {
-        if (b) self.status |= InterruptDisable else self.status &= ~InterruptDisable;
+    fn REL(self: *Self) void { // Relative
+        self.op.address = self.bus.read(self.pc + 1);
+        if ((self.op.address & 0x80) != 0)
+            self.op.address |= 0xFF00;
     }
 
-    pub fn overflowBit(self: *Self, b: bool) void {
-        if (b) self.status |= OverflowFlag else self.status &= ~OverflowFlag;
+    fn ABS(self: *Self) void { // Absolute
+        const addressLow: u8 = self.bus.read(self.pc);
+        const addressHigh: u8 = self.bus.read(self.pc + 1);
+        self.op.address = @as(u16, addressLow) | (@as(u16, addressHigh) << 8);
+        self.op.value = self.bus.read(self.op.address);
+        self.pc += 2;
     }
 
-    pub fn decimalBit(self: *Self, b: bool) void {
-        if (b) self.status |= DecimalMode else self.status &= ~DecimalMode;
+    fn ABX(self: *Self) void { // Asbolute, X
+        // self.op.address = (self.bus.read(self.pc) | (self.bus.read(self.pc + 1) << 8)) + self.x;
+        const addressLow: u8 = self.bus.read(self.pc);
+        const addressHigh: u8 = self.bus.read(self.pc + 1);
+        self.op.address = (@as(u16, addressLow) | (@as(u16, addressHigh) << 8)) + self.x;
+        self.op.value = self.bus.read(self.op.address);
+        self.pc += 2;
     }
 
-    pub fn carryBit(self: *Self, b: bool) void {
-        if (b) self.status |= CarryFlag else self.status &= ~CarryFlag;
+    fn ABY(self: *Self) void { // Asbolute, Y
+        // self.op.address = (self.bus.read(self.pc) | (self.bus.read(self.pc + 1) << 8)) + self.y;
+        const addressLow: u8 = self.bus.read(self.pc);
+        const addressHigh: u8 = self.bus.read(self.pc + 1);
+        self.op.address = (@as(u16, addressLow) | (@as(u16, addressHigh) << 8)) + self.y;
+        self.op.value = self.bus.read(self.op.address);
+        self.pc += 2;
     }
 
-    pub fn negativeBit(self: *Self, b: bool) void {
-        if (b) self.status |= NegativeFlag else self.status &= ~NegativeFlag;
+    fn IND(self: *Self) void { // Indirect jump with page bountry wraparound bug
+        const byte1: u8 = self.bus.read(self.pc + 1);
+        const addressLow: u8 = self.bus.read(byte1);
+        const addressHigh: u8 = self.bus.read((byte1 + 1) & 0x00FF);
+        self.op.address = @as(u16, addressLow) | (@as(u16, addressHigh) << 8);
+        self.op.value = self.bus.read(self.op.address);
+        self.pc += 2;
     }
 
-    pub fn zeroBit(self: *Self, b: bool) void {
-        if (b) self.status |= ZeroFlag else self.status &= ~ZeroFlag;
+    fn IDX(self: *Self) void { // Indexed indirect X
+        const v1: u8 = (self.bus.read(self.pc + 1) + self.x) & 0xFF;
+        const lowerByte: u8 = self.bus.read(v1 & 0x00FF);
+        const upperByte: u8 = self.bus.read((v1 + 1) & 0x00FF);
+        self.op.address = @as(u16, lowerByte) | (@as(u16, upperByte) << 8);
+        self.op.value = self.bus.read(self.op.address);
     }
 
-    pub fn pcIncrement(self: *Self, p: u16) void {
-        self.pc +%= p;
+    fn IDY(self: *Self) void {
+        const byte1: u8 = self.bus.read(self.pc + 1);
+        const addressLow: u8 = self.bus.read(byte1);
+        const addressHigh: u8 = self.bus.read((byte1 + 1) & 0x00FF);
+        self.op.address = @as(u16, addressLow) | (@as(u16, addressHigh) << 8);
+        self.op.address += self.y;
+        self.op.value = self.bus.read(self.op.address);
     }
 
-    pub fn cycleIncrement(self: *Self, c: u16) void {
-        self.cycles +%= c;
+    // Instructions
+    fn NOP(self: *Self) void { // no op
+        _ = self.a;
     }
 
-    pub fn getImmediate(self: *Self) u8 {
-        const value = self.bus.read(self.pc);
-        self.pcIncrement(1);
-        return value;
+    fn BRK(self: *Self) void { // Break
+        self.pc +%= 1;
+        const highByte: u8 = @intCast(self.pc >> 8);
+        const lowByte: u8 = @intCast(self.pc & 0xFF);
+        self.stackPush(highByte);
+        self.stackPush(lowByte);
+        self.stackPush(self.status | BreakCommand);
+        self.status |= InterruptDisable;
+        // self.pc = self.bus.read(0xFFFE) | (self.bus.read(0xFFFF) << 8);
+        const lowerByte: u8 = self.bus.read(0xFFFE);
+        const higherByte: u8 = self.bus.read(0xFFFF);
+
+        const lowAddress: u16 = @intCast(lowerByte);
+        const highAddress: u16 = (@as(u16, higherByte) << 8);
+        // const highAddress: u16 = @intCast(self.bus.read(0xFFFF) << 8);
+        self.pc = lowAddress | highAddress;
     }
 
-    pub fn getZeroPageAddr(self: *Self) u8 {
-        return self.getByte();
+    fn CLD(self: *Self) void { // Clear decimal
+        self.status &= ~DecimalMode;
     }
 
-    pub fn getZeroPageXAddr(self: *Self) u8 {
-        const zp_addr = self.getByte();
-        return (zp_addr +% self.x) & 0xFF;
+    fn SED(self: *Self) void { // Set Decimal
+        self.status |= DecimalMode;
     }
 
-    pub fn getZeroPageYAddr(self: *Self) u8 {
-        const zp_addr = self.getByte();
-        return (zp_addr +% self.y) & 0xFF;
+    fn CLC(self: *Self) void { // Clear Carry
+        self.status &= ~CarryFlag;
     }
 
-    pub fn getAbsoluteAddr(self: *Self) u16 {
-        return self.getWord();
+    fn SEC(self: *Self) void { // Set Carry
+        self.status |= CarryFlag;
     }
 
-    pub fn getAbsoluteXAddr(self: *Self) struct { addr: u16, crossed: bool } {
-        const base_addr = self.getWord();
-        const effective_addr = base_addr +% @as(u16, self.x);
-        const crossed = (base_addr & 0xFF00) != (effective_addr & 0xFF00);
-        return .{ .addr = effective_addr, .crossed = crossed };
+    fn CLI(self: *Self) void { // Clear Interrupt
+        self.status &= ~InterruptDisable;
     }
 
-    pub fn getAbsoluteYAddr(self: *Self) struct { addr: u16, crossed: bool } {
-        const base_addr = self.getWord();
-        const effective_addr = base_addr +% @as(u16, self.y);
-        const crossed = (base_addr & 0xFF00) != (effective_addr & 0xFF00);
-        return .{ .addr = effective_addr, .crossed = crossed };
+    fn SEI(self: *Self) void { // Set Interrupt
+        self.status |= InterruptDisable;
     }
 
-    pub fn getIndirectXAddr(self: *Self) u16 {
-        const zp_addr = self.getByte();
-        const effective_zp = (zp_addr +% self.x) & 0xFF;
-        const low = self.bus.read(effective_zp);
-        const high = self.bus.read((effective_zp +% 1) & 0xFF);
-        return (@as(u16, high) << 8) | low;
+    fn CLV(self: *Self) void { // Clear overflow
+        self.status &= ~OverflowFlag;
     }
 
-    pub fn getIndirectYAddr(self: *Self) struct { addr: u16, crossed: bool } {
-        const zp_addr = self.getByte();
-        const low = self.bus.read(zp_addr);
-        const high = self.bus.read((zp_addr +% 1) & 0xFF);
-        const base_addr = (@as(u16, high) << 8) | low;
-        const effective_addr = base_addr +% @as(u16, self.y);
-        const crossed = (base_addr & 0xFF00) != (effective_addr & 0xFF00);
-        return .{ .addr = effective_addr, .crossed = crossed };
+    fn LDA(self: *Self) void {
+        self.a = @intCast(self.op.value);
+        self.setSZ(self.a);
     }
 
-    pub fn pageCrossed(addr1: u16, addr2: u16) u8 {
-        return if ((addr1 & 0xFF00) != (addr2 & 0xFF00)) 1 else 0;
+    fn LDX(self: *Self) void {
+        self.x = @intCast(self.op.value);
+        self.setSZ(self.x);
     }
 
-    pub fn ora(self: *Self, value: u8) void {
-        self.a |= value;
-        self.setZeroNegative(self.a);
+    fn LDY(self: *Self) void {
+        self.y = @intCast(self.op.value);
+        self.setSZ(self.y);
     }
 
-    pub fn cand(self: *Self, value: u8) void {
-        self.a &= value;
-        self.setZeroNegative(self.a);
+    fn STA(self: *Self) void { // Store Accumulator
+        self.bus.write(self.op.address, self.a);
     }
 
-    pub fn eor(self: *Self, value: u8) void {
-        self.a ^= value;
-        self.setZeroNegative(self.a);
+    fn STX(self: *Self) void { // Store X
+        self.bus.write(self.op.address, self.x);
     }
 
-    pub fn adc(self: *Self, operand: u8) void {
-        const carry = (self.status & CarryFlag) != 0;
-        const a = self.a;
-        const carry_val: u8 = if (carry) 1 else 0;
-        const result = a +% operand +% carry_val;
-        self.a = result;
-        self.carryBit(@as(u16, a) + @as(u16, operand) + @as(u16, carry_val) > 0xFF);
-        self.setZeroNegative(result);
-        self.overflowBit(((a ^ result) & (operand ^ result) & 0x80) != 0);
+    fn STY(self: *Self) void { // Store Y
+        self.bus.write(self.op.address, self.y);
     }
 
-    pub fn sbc(self: *Self, operand: u8) void {
-        const carry = (self.status & CarryFlag) != 0;
-        const a = self.a;
-        const borrow: u8 = if (carry) 0 else 1;
-        const result = a -% operand -% borrow;
-        self.a = result;
-        self.carryBit(a >= (operand +% borrow));
-        self.setZeroNegative(result);
-        self.overflowBit(((a ^ result) & (a ^ operand) & 0x80) != 0);
+    fn DEC(self: *Self) void { // Decrement
+        self.bus.write(self.op.address, @intCast(self.op.value - 1));
+        self.setSZ(self.op.value);
     }
 
-    pub fn cmp(self: *Self, value: u8) void {
-        const result = self.a -% value;
-        self.carryBit(self.a >= value);
-        self.setZeroNegative(result);
+    fn DEX(self: *Self) void { // Decrement X
+        self.setSZ(self.x);
     }
 
-    pub fn cpx(self: *Self, value: u8) void {
-        const result = self.x -% value;
-        self.carryBit(self.x >= value);
-        self.setZeroNegative(result);
+    fn DEY(self: *Self) void { // Decrement Y
+        self.setSZ(self.y);
     }
 
-    pub fn cpy(self: *Self, value: u8) void {
-        const result = self.y -% value;
-        self.carryBit(self.y >= value);
-        self.setZeroNegative(result);
+    fn INC(self: *Self) void { // Increment
+        self.bus.write(self.op.address, @intCast(self.op.value + 1));
+        self.setSZ(self.op.value);
     }
 
-    pub fn aslMem(self: *Self, addr: u16) void {
-        const value = self.bus.read(addr);
-        const carry_out = (value & 0x80) != 0;
-        const result = value << 1;
-        self.bus.write(addr, result);
-        self.carryBit(carry_out);
-        self.setZeroNegative(result);
+    fn INX(self: *Self) void { // Increment X
+        self.setSZ(self.x);
     }
 
-    pub fn aslA(self: *Self) void {
-        const carry = (self.a & 0x80) != 0;
-        self.a <<= 1;
-        self.carryBit(carry);
-        self.setZeroNegative(self.a);
+    fn INY(self: *Self) void { // Increment Y
+        self.setSZ(self.y);
     }
 
-    pub fn lsrMem(self: *Self, addr: u16) void {
-        const value = self.bus.read(addr);
-        const carry_out = (value & 0x01) != 0;
-        const result = value >> 1;
-        self.bus.write(addr, result);
-        self.carryBit(carry_out);
-        self.zeroBit(result == 0);
-        self.negativeBit(false);
+    fn TAX(self: *Self) void { // Trasnfer accumulator to X
+        self.x = self.a;
+        self.setSZ(self.x);
     }
 
-    pub fn lsrA(self: *Self) void {
-        const carry_out = (self.a & 0x01) != 0;
-        self.a >>= 1;
-        self.carryBit(carry_out);
-        self.zeroBit(self.a == 0);
-        self.negativeBit(false);
+    fn TAY(self: *Self) void { // Trasnfer accumulator to Y
+        self.y = self.a;
+        self.setSZ(self.y);
     }
 
-    pub fn rolMem(self: *Self, addr: u16) void {
-        const value = self.bus.read(addr);
-        const carry_in = (self.status & CarryFlag) != 0;
-        const carry_out = (value & 0x80) != 0;
-        const carry_bit: u8 = if (carry_in) 1 else 0;
-        const result = (value << 1) | carry_bit;
-        self.bus.write(addr, result);
-        self.carryBit(carry_out);
-        self.setZeroNegative(result);
+    fn TXA(self: *Self) void { // Trasnfer X to Accumulator
+        self.a = self.x;
+        self.setSZ(self.a);
     }
 
-    pub fn rolA(self: *Self) void {
-        const carry_in = (self.status & CarryFlag) != 0;
-        const carry_out = (self.a & 0x80) != 0;
-        const carry_bit: u8 = if (carry_in) 1 else 0;
-        self.a = (self.a << 1) | carry_bit;
-        self.carryBit(carry_out);
-        self.setZeroNegative(self.a);
+    fn TYA(self: *Self) void { // Trasnfer Y to Accumulator
+        self.a = self.y;
+        self.setSZ(self.a);
     }
 
-    pub fn rorMem(self: *Self, addr: u16) void {
-        const value = self.bus.read(addr);
-        const carry_in = (self.status & CarryFlag) != 0;
-        const carry_out = (value & 0x01) != 0;
-        const carry_bit: u8 = if (carry_in) 0x80 else 0;
-        const result = (value >> 1) | carry_bit;
-        self.bus.write(addr, result);
-        self.carryBit(carry_out);
-        self.setZeroNegative(result);
+    fn TSX(self: *Self) void { // Trasnfer SP to X
+        self.x = self.sp;
+        self.setSZ(self.x);
     }
 
-    pub fn rorA(self: *Self) void {
-        const carry_in = (self.status & CarryFlag) != 0;
-        const carry_out = (self.a & 0x01) != 0;
-        const carry_bit: u8 = if (carry_in) 0x80 else 0;
-        self.a = (self.a >> 1) | carry_bit;
-        self.carryBit(carry_out);
-        self.setZeroNegative(self.a);
+    fn TXS(self: *Self) void { // Trasnfer X to SP
+        self.sp = self.x;
     }
 
-    pub fn lda(self: *Self, value: u8) void {
-        self.a = value;
-        self.setZeroNegative(self.a);
+    fn BEQ(self: *Self) void { // Branch not Equal
+        if ((self.status & ZeroFlag) != 0)
+            self.pc += self.op.address;
     }
 
-    pub fn ldx(self: *Self, value: u8) void {
-        self.x = value;
-        self.setZeroNegative(self.x);
+    fn BNE(self: *Self) void { // Branch on not equal
+        if ((self.status & ZeroFlag) == 0)
+            self.pc += self.op.address;
     }
 
-    pub fn ldy(self: *Self, value: u8) void {
-        self.y = value;
-        self.setZeroNegative(self.y);
+    fn BMI(self: *Self) void { // Branch if minus
+        if ((self.status & NegativeFlag) != 0)
+            self.pc += self.op.address;
     }
 
-    pub fn sta(self: *Self, addr: u16) void {
-        self.bus.write(addr, self.a);
+    fn BPL(self: *Self) void { // Branch if plus
+        if ((self.status & NegativeFlag) == 0)
+            self.pc += self.op.address;
     }
 
-    pub fn stx(self: *Self, addr: u16) void {
-        self.bus.write(addr, self.x);
+    fn BVS(self: *Self) void { // Branch on overflow set
+        if ((self.status & OverflowFlag) != 0)
+            self.pc += self.op.address;
     }
 
-    pub fn sty(self: *Self, addr: u16) void {
-        self.bus.write(addr, self.y);
+    fn BVC(self: *Self) void { // Branch on overflow clear
+        if ((self.status & OverflowFlag) == 0)
+            self.pc += self.op.address;
     }
 
-    pub fn decMem(self: *Self, addr: u16) void {
-        const value = self.bus.read(addr);
-        const result = value -% 1;
-        self.bus.write(addr, result);
-        self.setZeroNegative(result);
+    fn BCS(self: *Self) void { // Branch on carry set
+        if ((self.status & CarryFlag) != 0)
+            self.pc += self.op.address;
     }
 
-    pub fn incMem(self: *Self, addr: u16) void {
-        const value = self.bus.read(addr);
-        const result = value +% 1;
-        self.bus.write(addr, result);
-        self.setZeroNegative(result);
+    fn BCC(self: *Self) void { // Branch on carry clear
+        if ((self.status & CarryFlag) == 0)
+            self.pc += self.op.address;
     }
 
-    pub fn branchIf(self: *Self, condition: bool) void {
-        const offset: i8 = @bitCast(self.getByte());
-        if (condition) {
-            const old_pc = self.pc;
-            self.pc = @intCast(@as(i32, self.pc) + offset);
-            self.empty_cycles = 2 + pageCrossed(old_pc, self.pc);
-        } else {
-            self.empty_cycles = 1;
-        }
+    fn PHA(self: *Self) void { // Push A to stack
+        self.stackPush(self.a);
+    }
+
+    fn PLA(self: *Self) void { // Pull stack into A
+        self.a = self.stackPull();
+        self.setSZ(self.a);
+    }
+
+    fn PHP(self: *Self) void { // Push status register into stack
+        self.stackPush(self.status | BreakCommand);
+    }
+
+    fn PLP(self: *Self) void { // Pull stack into SR
+        self.status = self.stackPull() | 0x34;
+    }
+
+    fn JMP(self: *Self) void { // Jump
+        self.pc = self.op.address;
+    }
+
+    fn JSR(self: *Self) void { // Jump sub-routine
+        self.pc -%= 1;
+        const highByte: u8 = @intCast(self.pc >> 8);
+        const lowByte: u8 = @intCast(self.pc & 0xFF);
+        self.stackPush(highByte);
+        self.stackPush(lowByte);
+        self.pc = self.op.address;
+    }
+
+    fn RTS(self: *Self) void { // Return from subroutine
+        // self.pc = (self.stackPull() | (self.stackPull() << 8)) + 1;
+        self.pc = (@as(u16, self.stackPull()) | (@as(u16, self.stackPull()) << 8)) + 1;
+    }
+
+    fn RTI(self: *Self) void {
+        self.status = self.stackPull();
+        self.pc = (@as(u16, self.stackPull()) | (@as(u16, self.stackPull()) << 8)) + 1;
+        // self.pc = (self.stackPull() | (self.stackPull() << 8)) + 1;
+    }
+
+    fn CMP(self: *Self) void { // Compare with A
+        self.setSZ(self.a - self.op.value);
+        if (self.a >= self.op.value)
+            self.status |= CarryFlag
+        else
+            self.status &= ~CarryFlag;
+    }
+
+    fn CPX(self: *Self) void { // Compare with X
+        self.setSZ(self.x - self.op.value);
+        if (self.x >= self.op.value)
+            self.status |= CarryFlag
+        else
+            self.status &= ~CarryFlag;
+    }
+
+    fn CPY(self: *Self) void { // Compare with Y
+        self.setSZ(self.y - self.op.value);
+        if (self.y >= self.op.value)
+            self.status |= CarryFlag
+        else
+            self.status &= ~CarryFlag;
+    }
+
+    fn AND(self: *Self) void { // AND with A
+        self.a &= @intCast(self.op.value);
+        self.setSZ(self.a);
+    }
+
+    fn ORA(self: *Self) void { // OR with A
+        self.a |= @intCast(self.op.value);
+        self.setSZ(self.a);
+    }
+
+    fn EOR(self: *Self) void { // XOR with A
+        self.a ^= @intCast(self.op.value);
+        self.setSZ(self.a);
+    }
+
+    fn BIT(self: *Self) void { // BIT with A
+        if ((self.a & self.op.value) != 0)
+            self.status &= ~ZeroFlag
+        else
+            self.status |= ZeroFlag;
+    }
+
+    fn update(self: *Self, value: u8) void { // Helper function
+        if (self.op.setAcc) self.a = value
+        else self.bus.write(self.op.address, @intCast(self.op.value));
+
+        self.op.setAcc = false;
+        self.setSZ(value);
+    }
+
+    fn ASL(self: *Self) void { // Arithmetic Shift left
+        const result = (self.op.value << 1);
+        if ((result & 0xFF00) != 0) self.status |= CarryFlag
+        else self.status &= ~CarryFlag;
+        self.update(@intCast(result & 0xFF));
+    }
+
+    fn LSR(self: *Self) void { // Logical Shift Right
+        if ((self.op.value & 1) != 0) self.status |= CarryFlag
+        else self.status &= ~CarryFlag;
+        self.update(@intCast((self.op.value >> 1 ) & 0xFF));
+    }
+
+    fn ROL(self: *Self) void { // Rotate left
+        const result = ((self.op.value << 1) | (self.status & CarryFlag));
+        if ((result & 0x100) != 0) self.status |= CarryFlag
+        else self.status &= ~CarryFlag;
+        self.update(@intCast(result & 0xFF));
+    }
+
+    fn ROR(self: *Self) void { // Rotate right
+        const result = (self.op.value >> 1) | ((self.status & CarryFlag) << 7);
+        if ((self.op.value & 0x1) != 0) self.status |= CarryFlag
+        else self.status &= ~CarryFlag;
+        self.update(@intCast(result & 0xFF));
+    }
+
+    fn ADC(self: *Self) void { // Add with carry
+        var result = self.a + self.op.value + (self.status & CarryFlag);
+        self.setSZ(result);
+
+        // if (((result)^(self.a)) & ((result)^(self.op.value)) & 0x0080)
+        if ((((result)^(self.a)) & ((result)^(self.op.value)) & 0x0080) != 0)
+            self.status |= OverflowFlag
+        else
+            self.status &= ~OverflowFlag;
+
+        // if (self.status & NegativeFlag)
+        if ((self.status & NegativeFlag) != 0)
+            result += ((((result+0x66) ^ self.a ^ self.op.value) >> 3) & 0x22) * 3;
+
+        if ((result & 0xFF00) != 0) self.status |= CarryFlag
+        else self.status &= ~CarryFlag;
+
+        self.a = @intCast(result & 0xFF);
+    }
+
+    fn SBC(self: *Self) void {
+        self.op.value ^= 0xFF;
+        if ((self.status & NegativeFlag) != 0)
+            self.op.value -= 0x0066;
+
+        var result = self.a + self.op.value + (self.status & CarryFlag);
+        self.setSZ(result);
+
+        // if (((result) ^ (self.a)) & ((result) ^ (self.op.value)) & 0x0080)
+        if (((result ^ self.a) & (result ^ self.op.value) & 0x0080) != 0)
+            self.status |= OverflowFlag
+        else
+            self.status &= ~OverflowFlag;
+
+        if ((self.status & NegativeFlag) != 0)
+            result += ((((result + 0x66) ^ self.a ^ self.op.value) >> 3) & 0x22) * 3;
+
+        if ((result & 0xFF00) != 0) self.status |= CarryFlag
+        else self.status &= ~CarryFlag;
+
+        self.a = @intCast(result & 0xFF);
+    }
+
+    fn UND() void {
+        BRK();
     }
 
     pub fn tick(self: *Self) void {
-        self.cycleIncrement(1);
-        if (self.empty_cycles > 0) {
-            self.empty_cycles -= 1;
-            return;
-        }
-        self.readInstruction();
+        if (self.busy > 0) {
+            self.busy -= 1;
+        } else {
+            self.pc +%= 1;
+            self.opcode = self.bus.read(self.pc);
 
-        switch (self.opcode) {
-            0x00 => { // BRK
-                self.pcIncrement(1);
-                const return_addr = self.pc;
-                self.pushStack(@intCast((return_addr >> 8) & 0xFF));
-                self.pushStack(@intCast(return_addr & 0xFF));
-                self.pushStack(self.status | BreakCommand);
-                self.interruptBit(true);
-                const low = self.bus.read(0xFFFE);
-                const high = self.bus.read(0xFFFF);
-                self.pc = (@as(u16, high) << 8) | low;
-                self.empty_cycles = 6;
-            },
-            0x01 => { // ORA (Indirect,X)
-                const addr = self.getIndirectXAddr();
-                const value = self.bus.read(addr);
-                self.ora(value);
-                self.empty_cycles = 5;
-            },
-            0x05 => { // ORA Zero Page
-                const addr = self.getZeroPageAddr();
-                const value = self.bus.read(addr);
-                self.ora(value);
-                self.empty_cycles = 2;
-            },
-            0x06 => { // ASL Zero Page
-                const addr = self.getZeroPageAddr();
-                self.aslMem(addr);
-                self.empty_cycles = 4;
-            },
-            0x08 => { // PHP
-                self.pushStack(self.status | BreakCommand);
-                self.empty_cycles = 2;
-            },
-            0x09 => { // ORA Immediate
-                const value = self.getImmediate();
-                self.ora(value);
-                self.empty_cycles = 1;
-            },
-            0x0A => { // ASL Accumulator
-                self.aslA();
-                self.empty_cycles = 1;
-            },
-            0x0D => { // ORA Absolute
-                const addr = self.getAbsoluteAddr();
-                const value = self.bus.read(addr);
-                self.ora(value);
-                self.empty_cycles = 3;
-            },
-            0x0E => { // ASL Absolute
-                const addr = self.getAbsoluteAddr();
-                self.aslMem(addr);
-                self.empty_cycles = 5;
-            },
-            0x10 => { // BPL
-                self.branchIf((self.status & NegativeFlag) == 0);
-            },
-            0x11 => { // ORA (Indirect,Y)
-                const result = self.getIndirectYAddr();
-                const value = self.bus.read(result.addr);
-                self.ora(value);
-                self.empty_cycles = 4 + @as(u32, if (result.crossed) 1 else 0);
-            },
-            0x15 => { // ORA Zero Page,X
-                const addr = self.getZeroPageXAddr();
-                const value = self.bus.read(addr);
-                self.ora(value);
-                self.empty_cycles = 3;
-            },
-            0x16 => { // ASL Zero Page,X
-                const addr = self.getZeroPageXAddr();
-                self.aslMem(addr);
-                self.empty_cycles = 5;
-            },
-            0x18 => { // CLC
-                self.carryBit(false);
-                self.empty_cycles = 1;
-            },
-            0x19 => { // ORA Absolute,Y
-                const result = self.getAbsoluteYAddr();
-                const value = self.bus.read(result.addr);
-                self.ora(value);
-                self.empty_cycles = 3 + @as(u32, if (result.crossed) 1 else 0);
-            },
-            0x1D => { // ORA Absolute,X
-                const result = self.getAbsoluteXAddr();
-                const value = self.bus.read(result.addr);
-                self.ora(value);
-                self.empty_cycles = 3 + @as(u32, if (result.crossed) 1 else 0);
-            },
-            0x1E => { // ASL Absolute,X
-                const result = self.getAbsoluteXAddr();
-                self.aslMem(result.addr);
-                self.empty_cycles = 6;
-            },
-            0x20 => { // JSR Absolute
-                const addr = self.getWord();
-                const return_addr = self.pc - 1; // PC0 + 2
-                self.pushStack(@intCast((return_addr >> 8) & 0xFF));
-                self.pushStack(@intCast(return_addr & 0xFF));
-                self.pc = addr;
-                self.empty_cycles = 5;
-            },
-            0x21 => { // AND (Indirect,X)
-                const addr = self.getIndirectXAddr();
-                const value = self.bus.read(addr);
-                self.cand(value);
-                self.empty_cycles = 5;
-            },
-            0x24 => { // BIT Zero Page
-                const addr = self.getZeroPageAddr();
-                const value = self.bus.read(addr);
-                const result = self.a & value;
-                self.zeroBit(result == 0);
-                self.overflowBit((value & 0x40) != 0);
-                self.negativeBit((value & 0x80) != 0);
-                self.empty_cycles = 2;
-            },
-            0x25 => { // AND Zero Page
-                const addr = self.getZeroPageAddr();
-                const value = self.bus.read(addr);
-                self.cand(value);
-                self.empty_cycles = 2;
-            },
-            0x26 => { // ROL Zero Page
-                const addr = self.getZeroPageAddr();
-                self.rolMem(addr);
-                self.empty_cycles = 4;
-            },
-            0x28 => { // PLP
-                self.status = self.pullStack();
-                self.empty_cycles = 3;
-            },
-            0x29 => { // AND Immediate
-                const value = self.getImmediate();
-                self.cand(value);
-                self.empty_cycles = 1;
-            },
-            0x2A => { // ROL Accumulator
-                self.rolA();
-                self.empty_cycles = 1;
-            },
-            0x2C => { // BIT Absolute
-                const addr = self.getAbsoluteAddr();
-                const value = self.bus.read(addr);
-                const result = self.a & value;
-                self.zeroBit(result == 0);
-                self.overflowBit((value & 0x40) != 0);
-                self.negativeBit((value & 0x80) != 0);
-                self.empty_cycles = 3;
-            },
-            0x2D => { // AND Absolute
-                const addr = self.getAbsoluteAddr();
-                const value = self.bus.read(addr);
-                self.cand(value);
-                self.empty_cycles = 3;
-            },
-            0x2E => { // ROL Absolute
-                const addr = self.getAbsoluteAddr();
-                self.rolMem(addr);
-                self.empty_cycles = 5;
-            },
-            0x30 => { // BMI
-                self.branchIf((self.status & NegativeFlag) != 0);
-            },
-            0x31 => { // AND (Indirect,Y)
-                const result = self.getIndirectYAddr();
-                const value = self.bus.read(result.addr);
-                self.cand(value);
-                self.empty_cycles = 4 + @as(u32, if (result.crossed) 1 else 0);
-            },
-            0x35 => { // AND Zero Page,X
-                const addr = self.getZeroPageXAddr();
-                const value = self.bus.read(addr);
-                self.cand(value);
-                self.empty_cycles = 3;
-            },
-            0x38 => { // SEC
-                self.carryBit(true);
-                self.empty_cycles = 1;
-            },
-            0x39 => { // AND Absolute,Y
-                const result = self.getAbsoluteYAddr();
-                const value = self.bus.read(result.addr);
-                self.cand(value);
-                self.empty_cycles = 3 + @as(u32, if (result.crossed) 1 else 0);
-            },
-            0x3D => { // AND Absolute,X
-                const result = self.getAbsoluteXAddr();
-                const value = self.bus.read(result.addr);
-                self.cand(value);
-                self.empty_cycles = 3 + @as(u32, if (result.crossed) 1 else 0);
-            },
-            0x3E => { // ROL Absolute,X
-                const result = self.getAbsoluteXAddr();
-                self.rolMem(result.addr);
-                self.empty_cycles = 6;
-            },
-            0x40 => { // RTI
-                self.status = self.pullStack();
-                const low = self.pullStack();
-                const high = self.pullStack();
-                self.pc = (@as(u16, high) << 8) | low;
-                self.empty_cycles = 5;
-            },
-            0x41 => { // EOR (Indirect,X)
-                const addr = self.getIndirectXAddr();
-                const value = self.bus.read(addr);
-                self.eor(value);
-                self.empty_cycles = 5;
-            },
-            0x45 => { // EOR Zero Page
-                const addr = self.getZeroPageAddr();
-                const value = self.bus.read(addr);
-                self.eor(value);
-                self.empty_cycles = 2;
-            },
-            0x46 => { // LSR Zero Page
-                const addr = self.getZeroPageAddr();
-                self.lsrMem(addr);
-                self.empty_cycles = 4;
-            },
-            0x48 => { // PHA
-                self.pushStack(self.a);
-                self.empty_cycles = 2;
-            },
-            0x49 => { // EOR Immediate
-                const value = self.getImmediate();
-                self.eor(value);
-                self.empty_cycles = 1;
-            },
-            0x4A => { // LSR Accumulator
-                self.lsrA();
-                self.empty_cycles = 1;
-            },
-            0x4C => { // JMP Absolute
-                self.pc = self.getAbsoluteAddr();
-                self.empty_cycles = 2;
-            },
-            0x4D => { // EOR Absolute
-                const addr = self.getAbsoluteAddr();
-                const value = self.bus.read(addr);
-                self.eor(value);
-                self.empty_cycles = 3;
-            },
-            0x4E => { // LSR Absolute
-                const addr = self.getAbsoluteAddr();
-                self.lsrMem(addr);
-                self.empty_cycles = 5;
-            },
-            0x50 => { // BVC
-                self.branchIf((self.status & OverflowFlag) == 0);
-            },
-            0x51 => { // EOR (Indirect,Y)
-                const result = self.getIndirectYAddr();
-                const value = self.bus.read(result.addr);
-                self.eor(value);
-                self.empty_cycles = 4 + @as(u32, if (result.crossed) 1 else 0);
-            },
-            0x55 => { // EOR Zero Page,X
-                const addr = self.getZeroPageXAddr();
-                const value = self.bus.read(addr);
-                self.eor(value);
-                self.empty_cycles = 3;
-            },
-            0x56 => { // LSR Zero Page,X
-                const addr = self.getZeroPageXAddr();
-                self.lsrMem(addr);
-                self.empty_cycles = 5;
-            },
-            0x58 => { // CLI
-                self.interruptBit(false);
-                self.empty_cycles = 1;
-            },
-            0x59 => { // EOR Absolute,Y
-                const result = self.getAbsoluteYAddr();
-                const value = self.bus.read(result.addr);
-                self.eor(value);
-                self.empty_cycles = 3 + @as(u32, if (result.crossed) 1 else 0);
-            },
-            0x5D => { // EOR Absolute,X
-                const result = self.getAbsoluteXAddr();
-                const value = self.bus.read(result.addr);
-                self.eor(value);
-                self.empty_cycles = 3 + @as(u32, if (result.crossed) 1 else 0);
-            },
-            0x5E => { // LSR Absolute,X
-                const result = self.getAbsoluteXAddr();
-                self.lsrMem(result.addr);
-                self.empty_cycles = 6;
-            },
-            0x60 => { // RTS
-                const low = self.pullStack();
-                const high = self.pullStack();
-                self.pc = ((@as(u16, high) << 8) | low) + 1;
-                self.empty_cycles = 5;
-            },
-            0x61 => { // ADC (Indirect,X)
-                const addr = self.getIndirectXAddr();
-                const value = self.bus.read(addr);
-                self.adc(value);
-                self.empty_cycles = 5;
-            },
-            0x65 => { // ADC Zero Page
-                const addr = self.getZeroPageAddr();
-                const value = self.bus.read(addr);
-                self.adc(value);
-                self.empty_cycles = 2;
-            },
-            0x66 => { // ROR Zero Page
-                const addr = self.getZeroPageAddr();
-                self.rorMem(addr);
-                self.empty_cycles = 4;
-            },
-            0x68 => { // PLA
-                self.a = self.pullStack();
-                self.setZeroNegative(self.a);
-                self.empty_cycles = 3;
-            },
-            0x69 => { // ADC Immediate
-                const value = self.getImmediate();
-                self.adc(value);
-                self.empty_cycles = 1;
-            },
-            0x6A => { // ROR Accumulator
-                self.rorA();
-                self.empty_cycles = 1;
-            },
-            0x6C => { // JMP Indirect
-                const indirect_addr = self.getWord();
-                const low = self.bus.read(indirect_addr);
-                const high = self.bus.read((indirect_addr & 0xFF00) | ((indirect_addr + 1) & 0x00FF));
-                self.pc = (@as(u16, high) << 8) | low;
-                self.empty_cycles = 4;
-            },
-            0x6D => { // ADC Absolute
-                const addr = self.getAbsoluteAddr();
-                const value = self.bus.read(addr);
-                self.adc(value);
-                self.empty_cycles = 3;
-            },
-            0x6E => { // ROR Absolute
-                const addr = self.getAbsoluteAddr();
-                self.rorMem(addr);
-                self.empty_cycles = 5;
-            },
-            0x70 => { // BVS
-                self.branchIf((self.status & OverflowFlag) != 0);
-            },
-            0x71 => { // ADC (Indirect,Y)
-                const result = self.getIndirectYAddr();
-                const value = self.bus.read(result.addr);
-                self.adc(value);
-                self.empty_cycles = 4 + @as(u32, if (result.crossed) 1 else 0);
-            },
-            0x75 => { // ADC Zero Page,X
-                const addr = self.getZeroPageXAddr();
-                const value = self.bus.read(addr);
-                self.adc(value);
-                self.empty_cycles = 3;
-            },
-            0x76 => { // ROR Zero Page,X
-                const addr = self.getZeroPageXAddr();
-                self.rorMem(addr);
-                self.empty_cycles = 5;
-            },
-            0x78 => { // SEI
-                self.interruptBit(true);
-                self.empty_cycles = 1;
-            },
-            0x79 => { // ADC Absolute,Y
-                const result = self.getAbsoluteYAddr();
-                const value = self.bus.read(result.addr);
-                self.adc(value);
-                self.empty_cycles = 3 + @as(u32, if (result.crossed) 1 else 0);
-            },
-            0x7D => { // ADC Absolute,X
-                const result = self.getAbsoluteXAddr();
-                const value = self.bus.read(result.addr);
-                self.adc(value);
-                self.empty_cycles = 3 + @as(u32, if (result.crossed) 1 else 0);
-            },
-            0x7E => { // ROR Absolute,X
-                const result = self.getAbsoluteXAddr();
-                self.rorMem(result.addr);
-                self.empty_cycles = 6;
-            },
-            0x81 => { // STA (Indirect,X)
-                const addr = self.getIndirectXAddr();
-                self.sta(addr);
-                self.empty_cycles = 5;
-            },
-            0x84 => { // STY Zero Page
-                const addr = self.getZeroPageAddr();
-                self.sty(addr);
-                self.empty_cycles = 2;
-            },
-            0x85 => { // STA Zero Page
-                const addr = self.getZeroPageAddr();
-                self.sta(addr);
-                self.empty_cycles = 2;
-            },
-            0x86 => { // STX Zero Page
-                const addr = self.getZeroPageAddr();
-                self.stx(addr);
-                self.empty_cycles = 2;
-            },
-            0x88 => { // DEY
-                self.y -%= 1;
-                self.setZeroNegative(self.y);
-                self.empty_cycles = 1;
-            },
-            0x8A => { // TXA
-                self.a = self.x;
-                self.setZeroNegative(self.a);
-                self.empty_cycles = 1;
-            },
-            0x8C => { // STY Absolute
-                const addr = self.getAbsoluteAddr();
-                self.sty(addr);
-                self.empty_cycles = 3;
-            },
-            0x8D => { // STA Absolute
-                const addr = self.getAbsoluteAddr();
-                self.sta(addr);
-                self.empty_cycles = 3;
-            },
-            0x8E => { // STX Absolute
-                const addr = self.getAbsoluteAddr();
-                self.stx(addr);
-                self.empty_cycles = 3;
-            },
-            0x90 => { // BCC
-                self.branchIf((self.status & CarryFlag) == 0);
-            },
-            0x91 => { // STA (Indirect,Y)
-                const result = self.getIndirectYAddr();
-                self.sta(result.addr);
-                self.empty_cycles = 5;
-            },
-            0x94 => { // STY Zero Page,X
-                const addr = self.getZeroPageXAddr();
-                self.sty(addr);
-                self.empty_cycles = 3;
-            },
-            0x95 => { // STA Zero Page,X
-                const addr = self.getZeroPageXAddr();
-                self.sta(addr);
-                self.empty_cycles = 3;
-            },
-            0x96 => { // STX Zero Page,Y
-                const addr = self.getZeroPageYAddr();
-                self.stx(addr);
-                self.empty_cycles = 3;
-            },
-            0x98 => { // TYA
-                self.a = self.y;
-                self.setZeroNegative(self.a);
-                self.empty_cycles = 1;
-            },
-            0x99 => { // STA Absolute,Y
-                const result = self.getAbsoluteYAddr();
-                self.sta(result.addr);
-                self.empty_cycles = 4;
-            },
-            0x9A => { // TXS
-                self.sp = self.x;
-                self.empty_cycles = 1;
-            },
-            0x9D => { // STA Absolute,X
-                const result = self.getAbsoluteXAddr();
-                self.sta(result.addr);
-                self.empty_cycles = 4;
-            },
-            0xA0 => { // LDY Immediate
-                const value = self.getImmediate();
-                self.ldy(value);
-                self.empty_cycles = 1;
-            },
-            0xA1 => { // LDA (Indirect,X)
-                const addr = self.getIndirectXAddr();
-                const value = self.bus.read(addr);
-                self.lda(value);
-                self.empty_cycles = 5;
-            },
-            0xA2 => { // LDX Immediate
-                const value = self.getImmediate();
-                self.ldx(value);
-                self.empty_cycles = 1;
-            },
-            0xA4 => { // LDY Zero Page
-                const addr = self.getZeroPageAddr();
-                const value = self.bus.read(addr);
-                self.ldy(value);
-                self.empty_cycles = 2;
-            },
-            0xA5 => { // LDA Zero Page
-                const addr = self.getZeroPageAddr();
-                const value = self.bus.read(addr);
-                self.lda(value);
-                self.empty_cycles = 2;
-            },
-            0xA6 => { // LDX Zero Page
-                const addr = self.getZeroPageAddr();
-                const value = self.bus.read(addr);
-                self.ldx(value);
-                self.empty_cycles = 2;
-            },
-            0xA8 => { // TAY
-                self.y = self.a;
-                self.setZeroNegative(self.y);
-                self.empty_cycles = 1;
-            },
-            0xA9 => { // LDA Immediate
-                const value = self.getImmediate();
-                self.lda(value);
-                self.empty_cycles = 1;
-            },
-            0xAA => { // TAX
-                self.x = self.a;
-                self.setZeroNegative(self.x);
-                self.empty_cycles = 1;
-            },
-            0xAC => { // LDY Absolute
-                const addr = self.getAbsoluteAddr();
-                const value = self.bus.read(addr);
-                self.ldy(value);
-                self.empty_cycles = 3;
-            },
-            0xAD => { // LDA Absolute
-                const addr = self.getAbsoluteAddr();
-                const value = self.bus.read(addr);
-                self.lda(value);
-                self.empty_cycles = 3;
-            },
-            0xAE => { // LDX Absolute
-                const addr = self.getAbsoluteAddr();
-                const value = self.bus.read(addr);
-                self.ldx(value);
-                self.empty_cycles = 3;
-            },
-            0xB0 => { // BCS
-                self.branchIf((self.status & CarryFlag) != 0);
-            },
-            0xB1 => { // LDA (Indirect,Y)
-                const result = self.getIndirectYAddr();
-                const value = self.bus.read(result.addr);
-                self.lda(value);
-                self.empty_cycles = 4 + @as(u32, if (result.crossed) 1 else 0);
-                // self.empty_cycles = 4 + if (result.crossed) 1 else 0;
-            },
-            0xB4 => { // LDY Zero Page,X
-                const addr = self.getZeroPageXAddr();
-                const value = self.bus.read(addr);
-                self.ldy(value);
-                self.empty_cycles = 3;
-            },
-            0xB5 => { // LDA Zero Page,X
-                const addr = self.getZeroPageXAddr();
-                const value = self.bus.read(addr);
-                self.lda(value);
-                self.empty_cycles = 3;
-            },
-            0xB6 => { // LDX Zero Page,Y
-                const addr = self.getZeroPageYAddr();
-                const value = self.bus.read(addr);
-                self.ldx(value);
-                self.empty_cycles = 3;
-            },
-            0xB8 => { // CLV
-                self.overflowBit(false);
-                self.empty_cycles = 1;
-            },
-            0xB9 => { // LDA Absolute,Y
-                const result = self.getAbsoluteYAddr();
-                const value = self.bus.read(result.addr);
-                self.lda(value);
-                self.empty_cycles = 3 + @as(u32, if (result.crossed) 1 else 0);
-            },
-            0xBA => { // TSX
-                self.x = self.sp;
-                self.setZeroNegative(self.x);
-                self.empty_cycles = 1;
-            },
-            0xBC => { // LDY Absolute,X
-                const result = self.getAbsoluteXAddr();
-                const value = self.bus.read(result.addr);
-                self.ldy(value);
-                self.empty_cycles = 3 + @as(u32, if (result.crossed) 1 else 0);
-            },
-            0xBD => { // LDA Absolute,X
-                const result = self.getAbsoluteXAddr();
-                const value = self.bus.read(result.addr);
-                self.lda(value);
-                self.empty_cycles = 3 + @as(u32, if (result.crossed) 1 else 0);
-            },
-            0xBE => { // LDX Absolute,Y
-                const result = self.getAbsoluteYAddr();
-                const value = self.bus.read(result.addr);
-                self.ldx(value);
-                self.empty_cycles = 3 + @as(u32, if (result.crossed) 1 else 0);
-            },
-            0xC0 => { // CPY Immediate
-                const value = self.getImmediate();
-                self.cpy(value);
-                self.empty_cycles = 1;
-            },
-            0xC1 => { // CMP (Indirect,X)
-                const addr = self.getIndirectXAddr();
-                const value = self.bus.read(addr);
-                self.cmp(value);
-                self.empty_cycles = 5;
-            },
-            0xC4 => { // CPY Zero Page
-                const addr = self.getZeroPageAddr();
-                const value = self.bus.read(addr);
-                self.cpy(value);
-                self.empty_cycles = 2;
-            },
-            0xC5 => { // CMP Zero Page
-                const addr = self.getZeroPageAddr();
-                const value = self.bus.read(addr);
-                self.cmp(value);
-                self.empty_cycles = 2;
-            },
-            0xC6 => { // DEC Zero Page
-                const addr = self.getZeroPageAddr();
-                self.decMem(addr);
-                self.empty_cycles = 4;
-            },
-            0xC8 => { // INY
-                self.y +%= 1;
-                self.setZeroNegative(self.y);
-                self.empty_cycles = 1;
-            },
-            0xC9 => { // CMP Immediate
-                const value = self.getImmediate();
-                self.cmp(value);
-                self.empty_cycles = 1;
-            },
-            0xCA => { // DEX
-                self.x -%= 1;
-                self.setZeroNegative(self.x);
-                self.empty_cycles = 1;
-            },
-            0xCC => { // CPY Absolute
-                const addr = self.getAbsoluteAddr();
-                const value = self.bus.read(addr);
-                self.cpy(value);
-                self.empty_cycles = 3;
-            },
-            0xCD => { // CMP Absolute
-                const addr = self.getAbsoluteAddr();
-                const value = self.bus.read(addr);
-                self.cmp(value);
-                self.empty_cycles = 3;
-            },
-            0xCE => { // DEC Absolute
-                const addr = self.getAbsoluteAddr();
-                self.decMem(addr);
-                self.empty_cycles = 5;
-            },
-            0xD0 => { // BNE
-                self.branchIf((self.status & ZeroFlag) == 0);
-            },
-            0xD1 => { // CMP (Indirect,Y)
-                const result = self.getIndirectYAddr();
-                const value = self.bus.read(result.addr);
-                self.cmp(value);
-                self.empty_cycles = 4 + @as(u32, if (result.crossed) 1 else 0);
-            },
-            0xD5 => { // CMP Zero Page,X
-                const addr = self.getZeroPageXAddr();
-                const value = self.bus.read(addr);
-                self.cmp(value);
-                self.empty_cycles = 3;
-            },
-            0xD6 => { // DEC Zero Page,X
-                const addr = self.getZeroPageXAddr();
-                self.decMem(addr);
-                self.empty_cycles = 5;
-            },
-            0xD8 => { // CLD
-                self.decimalBit(false);
-                self.empty_cycles = 1;
-            },
-            0xD9 => { // CMP Absolute,Y
-                const result = self.getAbsoluteYAddr();
-                const value = self.bus.read(result.addr);
-                self.cmp(value);
-                self.empty_cycles = 3 + @as(u32, if (result.crossed) 1 else 0);
-            },
-            0xDD => { // CMP Absolute,X
-                const result = self.getAbsoluteXAddr();
-                const value = self.bus.read(result.addr);
-                self.cmp(value);
-                self.empty_cycles = 3 + @as(u32, if (result.crossed) 1 else 0);
-            },
-            0xDE => { // DEC Absolute,X
-                const result = self.getAbsoluteXAddr();
-                self.decMem(result.addr);
-                self.empty_cycles = 6;
-            },
-            0xE0 => { // CPX Immediate
-                const value = self.getImmediate();
-                self.cpx(value);
-                self.empty_cycles = 1;
-            },
-            0xE1 => { // SBC (Indirect,X)
-                const addr = self.getIndirectXAddr();
-                const value = self.bus.read(addr);
-                self.sbc(value);
-                self.empty_cycles = 5;
-            },
-            0xE4 => { // CPX Zero Page
-                const addr = self.getZeroPageAddr();
-                const value = self.bus.read(addr);
-                self.cpx(value);
-                self.empty_cycles = 2;
-            },
-            0xE5 => { // SBC Zero Page
-                const addr = self.getZeroPageAddr();
-                const value = self.bus.read(addr);
-                self.sbc(value);
-                self.empty_cycles = 2;
-            },
-            0xE6 => { // INC Zero Page
-                const addr = self.getZeroPageAddr();
-                self.incMem(addr);
-                self.empty_cycles = 4;
-            },
-            0xE8 => { // INX
-                self.x +%= 1;
-                self.setZeroNegative(self.x);
-                self.empty_cycles = 1;
-            },
-            0xE9 => { // SBC Immediate
-                const value = self.getImmediate();
-                self.sbc(value);
-                self.empty_cycles = 1;
-            },
-            0xEA => { // NOP
-                self.empty_cycles = 1;
-            },
-            0xEC => { // CPX Absolute
-                const addr = self.getAbsoluteAddr();
-                const value = self.bus.read(addr);
-                self.cpx(value);
-                self.empty_cycles = 3;
-            },
-            0xED => { // SBC Absolute
-                const addr = self.getAbsoluteAddr();
-                const value = self.bus.read(addr);
-                self.sbc(value);
-                self.empty_cycles = 3;
-            },
-            0xEE => { // INC Absolute
-                const addr = self.getAbsoluteAddr();
-                self.incMem(addr);
-                self.empty_cycles = 5;
-            },
-            0xF0 => { // BEQ
-                self.branchIf((self.status & ZeroFlag) != 0);
-            },
-            0xF1 => { // SBC (Indirect,Y)
-                const result = self.getIndirectYAddr();
-                const value = self.bus.read(result.addr);
-                self.sbc(value);
-                self.empty_cycles = 4 + @as(u32, if (result.crossed) 1 else 0);
-            },
-            0xF5 => { // SBC Zero Page,X
-                const addr = self.getZeroPageXAddr();
-                const value = self.bus.read(addr);
-                self.sbc(value);
-                self.empty_cycles = 3;
-            },
-            0xF6 => { // INC Zero Page,X
-                const addr = self.getZeroPageXAddr();
-                self.incMem(addr);
-                self.empty_cycles = 5;
-            },
-            0xF8 => { // SED
-                self.decimalBit(true);
-                self.empty_cycles = 1;
-            },
-            0xF9 => { // SBC Absolute,Y
-                const result = self.getAbsoluteYAddr();
-                const value = self.bus.read(result.addr);
-                self.sbc(value);
-                self.empty_cycles = 3 + @as(u32, if (result.crossed) 1 else 0);
-            },
-            0xFD => { // SBC Absolute,X
-                const result = self.getAbsoluteXAddr();
-                const value = self.bus.read(result.addr);
-                self.sbc(value);
-                self.empty_cycles = 3 + @as(u32, if (result.crossed) 1 else 0);
-            },
-            0xFE => { // INC Absolute,X
-                const result = self.getAbsoluteXAddr();
-                self.incMem(result.addr);
-                self.empty_cycles = 6;
-            },
-            else => {
-                std.debug.print("[warn] Unimplemented instruction 0x{X}\n", .{self.opcode});
-            },
+            switch (self.opcode) {
+                0x00 => {
+                    // self.IMP();
+                    self.BRK();
+                },
+                0x01 => {
+                    self.IDX();
+                    self.ORA();
+                },
+                0x02 => {},
+                0x03 => {},
+                0x04 => {},
+                0x05 => {
+                    self.ZPG();
+                    self.ORA();
+                },
+                0x06 => {
+                    self.ZPG();
+                    self.ASL();
+                },
+                0x07 => {},
+                0x08 => {
+                    // self.IMP();
+                    self.PHP();
+                },
+                0x09 => {
+                    self.IMM();
+                    self.ORA();
+                },
+                0x0A => {
+                    self.ACC();
+                    self.ASL();
+                },
+                0x0B => {},
+                0x0C => {},
+                0x0D => {
+                    self.ABS();
+                    self.ORA();
+                },
+                0x0E => {
+                    self.ABS();
+                    self.ASL();
+                },
+                0x0F => {},
+                0x10 => {
+                    self.REL();
+                    self.BPL();
+                },
+                0x11 => {
+                    self.IDY();
+                    self.ORA();
+                },
+                0x12 => {},
+                0x13 => {},
+                0x14 => {},
+                0x15 => {
+                    self.ZPX();
+                    self.ORA();
+                },
+                0x16 => {
+                    self.ZPX();
+                    self.ASL();
+                },
+                0x17 => {},
+                0x18 => {
+                    // self.IMP();
+                    self.CLC();
+                },
+                0x19 => {
+                    self.ABY();
+                    self.ORA();
+                },
+                0x1A => {},
+                0x1B => {},
+                0x1C => {},
+                0x1D => {
+                    self.ABX();
+                    self.ORA();
+                },
+                0x1E => {
+                    self.ABX();
+                    self.ASL();
+                },
+                0x1F => {},
+                0x20 => {
+                    self.ABS();
+                    self.JSR();
+                },
+                0x21 => {
+                    self.IDX();
+                    self.AND();
+                },
+                0x22 => {},
+                0x23 => {},
+                0x24 => {
+                    self.ZPG();
+                    self.BIT();
+                },
+                0x25 => {
+                    self.ZPG();
+                    self.AND();
+                },
+                0x26 => {
+                    self.ZPG();
+                    self.ROL();
+                },
+                0x27 => {},
+                0x28 => {
+                    // self.IMP();
+                    self.PLP();
+                },
+                0x29 => {
+                    self.IMM();
+                    self.AND();
+                },
+                0x2A => {
+                    self.ACC();
+                    self.ROL();
+                },
+                0x2B => {},
+                0x2C => {
+                    self.ABS();
+                    self.BIT();
+                },
+                0x2D => {
+                    self.ABS();
+                    self.AND();
+                },
+                0x2E => {
+                    self.ABS();
+                    self.ROL();
+                },
+                0x2F => {},
+                0x30 => {
+                    self.REL();
+                    self.BMI();
+                },
+                0x31 => {
+                    self.IDY();
+                    self.AND();
+                },
+                0x32 => {},
+                0x33 => {},
+                0x34 => {},
+                0x35 => {
+                    self.ZPX();
+                    self.AND();
+                },
+                0x36 => {},
+                0x37 => {},
+                0x38 => {
+                    // self.IMP();
+                    self.SEC();
+                },
+                0x39 => {
+                    self.ABY();
+                    self.AND();
+                },
+                0x3A => {},
+                0x3B => {},
+                0x3C => {},
+                0x3D => {
+                    self.ABX();
+                    self.AND();
+                },
+                0x3E => {
+                    self.ABX();
+                    self.ROL();
+                },
+                0x3F => {},
+                0x40 => {
+                    // self.IMP();
+                    self.RTI();
+                },
+                0x41 => {
+                    self.IDX();
+                    self.EOR();
+                },
+                0x42 => {},
+                0x43 => {},
+                0x44 => {},
+                0x45 => {
+                    self.ZPG();
+                    self.EOR();
+                },
+                0x46 => {
+                    self.ZPG();
+                    self.LSR();
+                },
+                0x47 => {},
+                0x48 => {
+                    // self.IMP();
+                    self.PHA();
+                },
+                0x49 => {
+                    self.IMM();
+                    self.EOR();
+                },
+                0x4A => {
+                    self.ACC();
+                    self.LSR();
+                },
+                0x4B => {},
+                0x4C => {
+                    self.ABS();
+                    self.JMP();
+                },
+                0x4D => {
+                    self.ABS();
+                    self.EOR();
+                },
+                0x4E => {
+                    self.ABS();
+                    self.LSR();
+                },
+                0x4F => {},
+                0x50 => {
+                    self.REL();
+                    self.BVC();
+                },
+                0x51 => {
+                    self.IDY();
+                    self.EOR();
+                },
+                0x52 => {},
+                0x53 => {},
+                0x54 => {},
+                0x55 => {
+                    self.ZPX();
+                    self.EOR();
+                },
+                0x56 => {
+                    self.ZPX();
+                    self.LSR();
+                },
+                0x57 => {},
+                0x58 => {
+                    // self.IMP();
+                    self.CLI();
+                },
+                0x59 => {
+                    self.ABY();
+                    self.EOR();
+                },
+                0x5A => {},
+                0x5B => {},
+                0x5C => {},
+                0x5D => {
+                    self.ABX();
+                    self.EOR();
+                },
+                0x5E => {
+                    self.ABX();
+                    self.LSR();
+                },
+                0x5F => {},
+                0x60 => {
+                    // self.IMP();
+                    self.RTS();
+                },
+                0x61 => {
+                    self.IDX();
+                    self.ADC();
+                },
+                0x62 => {},
+                0x63 => {},
+                0x64 => {},
+                0x65 => {
+                    self.ZPG();
+                    self.ADC();
+                },
+                0x66 => {
+                    self.ZPG();
+                    self.ROR();
+                },
+                0x67 => {},
+                0x68 => {
+                    // self.IMP();
+                    self.PLA();
+                },
+                0x69 => {
+                    self.IMM();
+                    self.ADC();
+                },
+                0x6A => {
+                    self.ACC();
+                    self.ROR();
+                },
+                0x6B => {},
+                0x6C => {
+                    self.IND();
+                    self.JMP();
+                },
+                0x6D => {
+                    self.ABS();
+                    self.ADC();
+                },
+                0x6E => {
+                    self.ABS();
+                    self.ROR();
+                },
+                0x6F => {},
+                0x70 => {
+                    self.REL();
+                    self.BVS();
+                },
+                0x71 => {
+                    self.IDY();
+                    self.ADC();
+                },
+                0x72 => {},
+                0x73 => {},
+                0x74 => {},
+                0x75 => {
+                    self.ZPX();
+                    self.ADC();
+                },
+                0x76 => {
+                    self.ZPX();
+                    self.ROR();
+                },
+                0x77 => {},
+                0x78 => {
+                    // self.IMP();
+                    self.SEI();
+                },
+                0x79 => {
+                    self.ABY();
+                    self.ADC();
+                },
+                0x7A => {},
+                0x7B => {},
+                0x7C => {},
+                0x7D => {
+                    self.ABX();
+                    self.ADC();
+                },
+                0x7E => {
+                    self.ABX();
+                    self.ROR();
+                },
+                0x7F => {},
+                0x80 => {},
+                0x81 => {
+                    self.IDX();
+                    self.STA();
+                },
+                0x82 => {},
+                0x83 => {},
+                0x84 => {
+                    self.ZPG();
+                    self.STY();
+                },
+                0x85 => {
+                    self.ZPG();
+                    self.STA();
+                },
+                0x86 => {
+                    self.ZPG();
+                    self.STX();
+                },
+                0x87 => {},
+                0x88 => {
+                    // self.IMP();
+                    self.DEY();
+                },
+                0x89 => {},
+                0x8A => {
+                    // self.IMP();
+                    self.TXA();
+                },
+                0x8B => {},
+                0x8C => {
+                    self.ABS();
+                    self.STY();
+                },
+                0x8D => {
+                    self.ABS();
+                    self.STA();
+                },
+                0x8E => {
+                    self.ABS();
+                    self.STX();
+                },
+                0x8F => {},
+                0x90 => {
+                    self.REL();
+                    self.BCC();
+                },
+                0x91 => {
+                    self.IDY();
+                    self.STA();
+                },
+                0x92 => {},
+                0x93 => {},
+                0x94 => {
+                    self.ZPX();
+                    self.STY();
+                },
+                0x95 => {
+                    self.ZPX();
+                    self.STA();
+                },
+                0x96 => {
+                    self.ZPY();
+                    self.STX();
+                },
+                0x97 => {},
+                0x98 => {
+                    // self.IMP();
+                    self.TYA();
+                },
+                0x99 => {
+                    self.ABY();
+                    self.STA();
+                },
+                0x9A => {
+                    // self.IMP();
+                    self.TXS();
+                },
+                0x9B => {},
+                0x9C => {},
+                0x9D => {
+                    self.ABX();
+                    self.STA();
+                },
+                0x9E => {},
+                0x9F => {},
+                0xA0 => {
+                    self.IMM();
+                    self.LDY();
+                },
+                0xA1 => {
+                    self.IDX();
+                    self.LDA();
+                },
+                0xA2 => {
+                    self.IMM();
+                    self.LDX();
+                },
+                0xA3 => {},
+                0xA4 => {
+                    self.ZPG();
+                    self.LDY();
+                },
+                0xA5 => {
+                    self.ZPG();
+                    self.LDA();
+                },
+                0xA6 => {
+                    self.ZPG();
+                    self.LDX();
+                },
+                0xA7 => {},
+                0xA8 => {
+                    // self.IMP();
+                    self.TAY();
+                },
+                0xA9 => {
+                    // self.IMP();
+                    self.LDA();
+                },
+                0xAA => {
+                    // self.IMP();
+                    self.TAX();
+                },
+                0xAB => {},
+                0xAC => {
+                    self.ABS();
+                    self.LDY();
+                },
+                0xAD => {
+                    self.ABS();
+                    self.LDA();
+                },
+                0xAE => {
+                    self.ABS();
+                    self.LDX();
+                },
+                0xAF => {},
+                0xB0 => {
+                    self.REL();
+                    self.BCS();
+                },
+                0xB1 => {
+                    self.IDY();
+                    self.LDA();
+                },
+                0xB2 => {},
+                0xB3 => {},
+                0xB4 => {
+                    self.ZPX();
+                    self.LDY();
+                },
+                0xB5 => {
+                    self.ZPX();
+                    self.LDA();
+                },
+                0xB6 => {
+                    self.ZPY();
+                    self.LDX();
+                },
+                0xB7 => {},
+                0xB8 => {
+                    // self.IMP();
+                    self.CLV();
+                },
+                0xB9 => {
+                    self.ABY();
+                    self.LDA();
+                },
+                0xBA => {
+                    // self.IMP();
+                    self.TSX();
+                },
+                0xBB => {},
+                0xBC => {
+                    self.ABX();
+                    self.LDY();
+                },
+                0xBD => {
+                    self.ABX();
+                    self.LDA();
+                },
+                0xBE => {
+                    self.ABY();
+                    self.LDX();
+                },
+                0xBF => {},
+                0xC0 => {
+                    self.IMM();
+                    self.CPY();
+                },
+                0xC1 => {
+                    self.IDX();
+                    self.CMP();
+                },
+                0xC2 => {},
+                0xC3 => {},
+                0xC4 => {
+                    self.ZPG();
+                    self.CPY();
+                },
+                0xC5 => {
+                    self.ZPG();
+                    self.CMP();
+                },
+                0xC6 => {
+                    self.ZPG();
+                    self.DEC();
+                },
+                0xC7 => {},
+                0xC8 => {
+                    // self.IMP();
+                    self.INY();
+                },
+                0xC9 => {},
+                0xCA => {
+                    // self.IMP();
+                    self.DEX();
+                },
+                0xCB => {},
+                0xCC => {
+                    self.ABS();
+                    self.CPY();
+                },
+                0xCD => {
+                    self.ABS();
+                    self.CMP();
+                },
+                0xCE => {
+                    self.ABS();
+                    self.DEC();
+                },
+                0xCF => {},
+                0xD0 => {
+                    self.REL();
+                    self.BNE();
+                },
+                0xD1 => {
+                    self.IDY();
+                    self.CMP();
+                },
+                0xD2 => {},
+                0xD3 => {},
+                0xD4 => {},
+                0xD5 => {
+                    self.ZPX();
+                    self.CMP();
+                },
+                0xD6 => {
+                    self.ZPX();
+                    self.DEC();
+                },
+                0xD7 => {},
+                0xD8 => {
+                    // self.IMP();
+                    self.CLD();
+                },
+                0xD9 => {
+                    self.ABY();
+                    self.CMP();
+                },
+                0xDA => {},
+                0xDB => {},
+                0xDC => {},
+                0xDD => {
+                    self.ABX();
+                    self.CMP();
+                },
+                0xDE => {
+                    self.ABX();
+                    self.DEC();
+                },
+                0xDF => {},
+                0xE0 => {
+                    self.IMM();
+                    self.CPX();
+                },
+                0xE1 => {
+                    self.IDX();
+                    self.SBC();
+                },
+                0xE2 => {},
+                0xE3 => {},
+                0xE4 => {
+                    self.ZPG();
+                    self.CPX();
+                },
+                0xE5 => {
+                    self.ZPG();
+                    self.SBC();
+                },
+                0xE6 => {
+                    self.ZPG();
+                    self.INC();
+                },
+                0xE7 => {},
+                0xE8 => {
+                    // self.IMP();
+                    self.INX();
+                },
+                0xE9 => {
+                    self.IMM();
+                    self.SBC();
+                },
+                0xEA => {
+                    // self.IMP();
+                    self.NOP();
+                },
+                0xEB => {},
+                0xEC => {
+                    self.ABS();
+                    self.CPX();
+                },
+                0xED => {
+                    self.ABS();
+                    self.SBC();
+                },
+                0xEE => {
+                    self.ABS();
+                    self.INC();
+                },
+                0xEF => {},
+                0xF0 => {
+                    self.REL();
+                    self.BEQ();
+                },
+                0xF1 => {
+                    self.IDY();
+                    self.SBC();
+                },
+                0xF2 => {},
+                0xF3 => {},
+                0xF4 => {},
+                0xF5 => {
+                    self.ZPX();
+                    self.SBC();
+                },
+                0xF6 => {
+                    self.ZPX();
+                    self.INC();
+                },
+                0xF7 => {},
+                0xF8 => {
+                    // self.IMP();
+                    self.SED();
+                },
+                0xF9 => {
+                    self.ABY();
+                    self.SBC();
+                },
+                0xFA => {},
+                0xFB => {},
+                0xFC => {},
+                0xFD => {
+                    self.ABX();
+                    self.SBC();
+                },
+                0xFE => {
+                    self.ABX();
+                    self.INC();
+                },
+                0xFF => {},
+            }
+            // cycles6502[self.opcode]();
+        }
+        if ((self.cycles % 100) == 0) {
+            // read from kbd
         }
     }
+
 };
 
