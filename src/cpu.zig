@@ -12,8 +12,9 @@ const NegativeFlag: u8     = 0b10000000; // Bit 7
 
 const Operand = struct {
     setAcc: bool,   // 1 byte
-    value: u16,     // 2 bytes
+    value: u8,     // 1 bytes
     address: u16,   // 2 bytes
+    // value: u16,     // 2 bytes
 };
 
 
@@ -360,7 +361,7 @@ pub const CPU = struct {
 
     fn BPL(self: *Self) void { // Branch if plus
         if ((self.status & NegativeFlag) == 0)
-            self.pc += self.op.address;
+            self.pc +%= self.op.address;
     }
 
     fn BVS(self: *Self) void { // Branch on overflow set
@@ -479,7 +480,7 @@ pub const CPU = struct {
     }
 
     fn ASL(self: *Self) void { // Arithmetic Shift left
-        const result = (self.op.value << 1);
+        const result: u16 = @intCast(self.op.value << 1);
         if ((result & 0xFF00) != 0) self.status |= CarryFlag
         else self.status &= ~CarryFlag;
         self.update(@intCast(result & 0xFF));
@@ -492,7 +493,7 @@ pub const CPU = struct {
     }
 
     fn ROL(self: *Self) void { // Rotate left
-        const result = ((self.op.value << 1) | (self.status & CarryFlag));
+        const result: u16 = @intCast((self.op.value << 1) | (self.status & CarryFlag));
         if ((result & 0x100) != 0) self.status |= CarryFlag
         else self.status &= ~CarryFlag;
         self.update(@intCast(result & 0xFF));
@@ -506,7 +507,8 @@ pub const CPU = struct {
     }
 
     fn ADC(self: *Self) void { // Add with carry
-        var result = self.a + self.op.value + (self.status & CarryFlag);
+        // var result = self.a + self.op.value + (self.status & CarryFlag);
+        var result: u16 = @intCast(self.a + self.op.value + (self.status & CarryFlag));
         self.setSZ(result);
 
         // if (((result)^(self.a)) & ((result)^(self.op.value)) & 0x0080)
@@ -530,7 +532,7 @@ pub const CPU = struct {
         if ((self.status & NegativeFlag) != 0)
             self.op.value -= 0x0066;
 
-        var result = self.a + self.op.value + (self.status & CarryFlag);
+        var result: u16 = @intCast(self.a + self.op.value + (self.status & CarryFlag));
         self.setSZ(result);
 
         // if (((result) ^ (self.a)) & ((result) ^ (self.op.value)) & 0x0080)
