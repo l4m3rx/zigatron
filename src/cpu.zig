@@ -303,8 +303,10 @@ pub const CPU = struct {
     }
 
     fn INC(self: *Self) void { // Increment
-        self.bus.write(self.op.address, @intCast(self.op.value + 1));
-        self.setSZ(self.op.value);
+        // self.bus.write(self.op.address, @intCast(self.op.value + 1));
+        self.bus.write(self.op.address, (self.op.value + 1));
+        const sz_value: u16 = @intCast(self.op.value);
+        self.setSZ(sz_value);
     }
 
     fn INX(self: *Self) void { // Increment X
