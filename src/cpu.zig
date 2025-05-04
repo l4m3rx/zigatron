@@ -134,27 +134,32 @@ pub const CPU = struct {
     }
 
     fn IMM(self: *Self) void { // IMMediate
-        self.op.address = self.pc + 1;
+        self.op.address = self.pc;
+        self.pc +%= 1;
         self.op.value = self.bus.read(self.op.address);
     }
 
     fn ZPG(self: *Self) void { // Zero page
-        self.op.address = self.bus.read(self.pc + 1);
+        self.op.address = self.bus.read(self.pc);
+        self.pc +%= 1;
         self.op.value = self.bus.read(self.op.address);
     }
 
     fn ZPX(self: *Self) void { // Zero page,X
-        self.op.address = (self.bus.read(self.pc + 1) + self.x) & 0xFF;
+        self.op.address = (self.bus.read(self.pc) + self.x) & 0xFF;
+        self.pc +%= 1;
         self.op.value = self.bus.read(self.op.address);
     }
 
     fn ZPY(self: *Self) void { // Zero page,Y
-        self.op.address = (self.bus.read(self.pc + 1) + self.y) & 0xFF;
+        self.op.address = (self.bus.read(self.pc) + self.y) & 0xFF;
+        self.pc +%= 1;
         self.op.value = self.bus.read(self.op.address);
     }
 
     fn REL(self: *Self) void { // Relative
-        self.op.address = self.bus.read(self.pc + 1);
+        self.op.address = self.bus.read(self.pc);
+        self.pc +%= 1;
         if ((self.op.address & 0x80) != 0)
             self.op.address |= 0xFF00;
     }
@@ -164,7 +169,7 @@ pub const CPU = struct {
         const addressHigh: u8 = self.bus.read(self.pc + 1);
         self.op.address = @as(u16, addressLow) | (@as(u16, addressHigh) << 8);
         self.op.value = self.bus.read(self.op.address);
-        self.pc += 2;
+        self.pc +%= 2;
     }
 
     fn ABX(self: *Self) void { // Asbolute, X
@@ -173,7 +178,7 @@ pub const CPU = struct {
         const addressHigh: u8 = self.bus.read(self.pc + 1);
         self.op.address = (@as(u16, addressLow) | (@as(u16, addressHigh) << 8)) + self.x;
         self.op.value = self.bus.read(self.op.address);
-        self.pc += 2;
+        self.pc +%= 2;
     }
 
     fn ABY(self: *Self) void { // Asbolute, Y
@@ -195,17 +200,21 @@ pub const CPU = struct {
     }
 
     fn IDX(self: *Self) void { // Indexed indirect X
-        const v1: u8 = (self.bus.read(self.pc + 1) + self.x) & 0xFF;
+        const v1: u8 = (self.bus.read(self.pc) + self.x) & 0xFF;
         const lowerByte: u8 = self.bus.read(v1 & 0x00FF);
         const upperByte: u8 = self.bus.read((v1 + 1) & 0x00FF);
+
+        self.pc +%= 1;
         self.op.address = @as(u16, lowerByte) | (@as(u16, upperByte) << 8);
         self.op.value = self.bus.read(self.op.address);
     }
 
     fn IDY(self: *Self) void {
-        const byte1: u8 = self.bus.read(self.pc + 1);
+        const byte1: u8 = self.bus.read(self.pc);
         const addressLow: u8 = self.bus.read(byte1);
         const addressHigh: u8 = self.bus.read((byte1 + 1) & 0x00FF);
+
+        self.pc +%= 1;
         self.op.address = @as(u16, addressLow) | (@as(u16, addressHigh) << 8);
         self.op.address += self.y;
         self.op.value = self.bus.read(self.op.address);
@@ -290,7 +299,8 @@ pub const CPU = struct {
     }
 
     fn DEC(self: *Self) void { // Decrement
-        self.bus.write(self.op.address, @intCast(self.op.value - 1));
+        self.op.value -%= 1;
+        self.bus.write(self.op.address, self.op.value);
         self.setSZ(self.op.value);
     }
 
@@ -303,8 +313,8 @@ pub const CPU = struct {
     }
 
     fn INC(self: *Self) void { // Increment
-        // self.bus.write(self.op.address, @intCast(self.op.value + 1));
-        self.bus.write(self.op.address, (self.op.value + 1));
+        self.op.value +%= 1;
+        self.bus.write(self.op.address, self.op.value);
         const sz_value: u16 = @intCast(self.op.value);
         self.setSZ(sz_value);
     }
@@ -348,7 +358,7 @@ pub const CPU = struct {
 
     fn BEQ(self: *Self) void { // Branch not Equal
         if ((self.status & ZeroFlag) != 0)
-            self.pc += self.op.address;
+            self.pc +%= self.op.address;
     }
 
     fn BNE(self: *Self) void { // Branch on not equal
