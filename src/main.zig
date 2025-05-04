@@ -10,6 +10,9 @@ pub fn main() !void {
 
     const allocator = arena.allocator();
 
+    const stdout = std.io.getStdOut().writer();
+    var stdin = std.io.getStdIn().reader();
+
     // Get command line arguments
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
@@ -20,6 +23,7 @@ pub fn main() !void {
     //     return error.MissingArgument;
     // }
     // const game_file = args[1];
+
 
     var bus = try BUS.init(allocator);
     defer bus.deinit();
@@ -40,8 +44,8 @@ pub fn main() !void {
 
     while (true) {
         cpu.tick();
-        std.time.sleep(100*100*100);
-        // std.time.sleep(100*1000*100_0);
+        // std.time.sleep(100*100*100);
+        std.time.sleep(100*1000*100_0);
         cycles +%= 1;
     }
 }

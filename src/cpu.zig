@@ -1,20 +1,19 @@
 const std = @import("std");
 const BUS = @import("bus.zig").BUS;
 
-const CarryFlag: u8        = 0b00000001; // Bit 0
+const CarryFlag: u8        = 0b00000001;
 const ZeroFlag: u8         = 0b00000010;
 const InterruptDisable: u8 = 0b00000100;
 const DecimalMode: u8      = 0b00001000;
 const BreakCommand: u8     = 0b00010000;
 const UnusedFlag: u8       = 0b00100000;
 const OverflowFlag: u8     = 0b01000000;
-const NegativeFlag: u8     = 0b10000000; // Bit 7
+const NegativeFlag: u8     = 0b10000000;
 
 const Operand = struct {
     setAcc: bool,   // 1 byte
-    value: u8,     // 1 bytes
+    value: u8,      // 1 bytes
     address: u16,   // 2 bytes
-    // value: u16,     // 2 bytes
 };
 
 
@@ -36,8 +35,6 @@ pub const CPU = struct {
     const Self = @This();
 
     // // Define function types
-    // const AddressingMode = fn (cpu: *CPU) void;
-    // const Instruction = fn (cpu: *CPU) void;
     // const PCCycles6502 = fn (cpu: *CPU) void;
     // const Cycles6502 = fn (cpu: *CPU) void;
 
@@ -92,7 +89,11 @@ pub const CPU = struct {
             .pc = 0xFFFC,
             .status = 0x34,
             .alloc = alloc,
-            .op = Operand{ .setAcc = false, .value = 0, .address = 0 }
+            .op = Operand{
+                .setAcc = false,
+                .value = 0,
+                .address = 0
+            }
         };
     }
 
@@ -105,6 +106,7 @@ pub const CPU = struct {
         return self.bus.read(0x100 + @as(u16, (self.sp + 1)));
     }
 
+    // Reset & set entry point
     pub fn reset(self: *Self, entrypoint: u16) void {
         self.busy = 0;
         self.sp = 0xFF;
@@ -427,14 +429,12 @@ pub const CPU = struct {
     }
 
     fn RTS(self: *Self) void { // Return from subroutine
-        // self.pc = (self.stackPull() | (self.stackPull() << 8)) + 1;
         self.pc = (@as(u16, self.stackPull()) | (@as(u16, self.stackPull()) << 8)) + 1;
     }
 
     fn RTI(self: *Self) void {
         self.status = self.stackPull();
         self.pc = (@as(u16, self.stackPull()) | (@as(u16, self.stackPull()) << 8)) + 1;
-        // self.pc = (self.stackPull() | (self.stackPull() << 8)) + 1;
     }
 
     fn CMP(self: *Self) void { // Compare with A
@@ -519,17 +519,14 @@ pub const CPU = struct {
     }
 
     fn ADC(self: *Self) void { // Add with carry
-        // var result = self.a + self.op.value + (self.status & CarryFlag);
         var result: u16 = @intCast(self.a + self.op.value + (self.status & CarryFlag));
         self.setSZ(result);
 
-        // if (((result)^(self.a)) & ((result)^(self.op.value)) & 0x0080)
         if ((((result)^(self.a)) & ((result)^(self.op.value)) & 0x0080) != 0)
             self.status |= OverflowFlag
         else
             self.status &= ~OverflowFlag;
 
-        // if (self.status & NegativeFlag)
         if ((self.status & NegativeFlag) != 0)
             result += ((((result+0x66) ^ self.a ^ self.op.value) >> 3) & 0x22) * 3;
 
@@ -547,7 +544,6 @@ pub const CPU = struct {
         var result: u16 = @intCast(self.a + self.op.value + (self.status & CarryFlag));
         self.setSZ(result);
 
-        // if (((result) ^ (self.a)) & ((result) ^ (self.op.value)) & 0x0080)
         if (((result ^ self.a) & (result ^ self.op.value) & 0x0080) != 0)
             self.status |= OverflowFlag
         else
@@ -574,708 +570,261 @@ pub const CPU = struct {
             self.opcode = self.bus.read(self.pc);
 
             switch (self.opcode) {
-                0x00 => {
-                    // self.IMP();
-                    self.BRK();
-                },
-                0x01 => {
-                    self.IDX();
-                    self.ORA();
-                },
+                0x00 => { self.BRK(); },
+                0x01 => { self.IDX(); self.ORA(); },
                 0x02 => {},
                 0x03 => {},
                 0x04 => {},
-                0x05 => {
-                    self.ZPG();
-                    self.ORA();
-                },
-                0x06 => {
-                    self.ZPG();
-                    self.ASL();
-                },
+                0x05 => { self.ZPG(); self.ORA(); },
+                0x06 => { self.ZPG(); self.ASL(); },
                 0x07 => {},
-                0x08 => {
-                    // self.IMP();
-                    self.PHP();
-                },
-                0x09 => {
-                    self.IMM();
-                    self.ORA();
-                },
-                0x0A => {
-                    self.ACC();
-                    self.ASL();
-                },
+                0x08 => { self.PHP(); },
+                0x09 => { self.IMM(); self.ORA(); },
+                0x0A => { self.ACC(); self.ASL(); },
                 0x0B => {},
                 0x0C => {},
-                0x0D => {
-                    self.ABS();
-                    self.ORA();
-                },
-                0x0E => {
-                    self.ABS();
-                    self.ASL();
-                },
+                0x0D => { self.ABS(); self.ORA(); },
+                0x0E => { self.ABS(); self.ASL(); },
                 0x0F => {},
-                0x10 => {
-                    self.REL();
-                    self.BPL();
-                },
-                0x11 => {
-                    self.IDY();
-                    self.ORA();
-                },
+                0x10 => { self.REL(); self.BPL(); },
+                0x11 => { self.IDY(); self.ORA(); },
                 0x12 => {},
                 0x13 => {},
                 0x14 => {},
-                0x15 => {
-                    self.ZPX();
-                    self.ORA();
-                },
-                0x16 => {
-                    self.ZPX();
-                    self.ASL();
-                },
+                0x15 => { self.ZPX(); self.ORA(); },
+                0x16 => { self.ZPX(); self.ASL(); },
                 0x17 => {},
-                0x18 => {
-                    // self.IMP();
-                    self.CLC();
-                },
-                0x19 => {
-                    self.ABY();
-                    self.ORA();
-                },
+                0x18 => { self.CLC(); },
+                0x19 => { self.ABY(); self.ORA(); },
                 0x1A => {},
                 0x1B => {},
                 0x1C => {},
-                0x1D => {
-                    self.ABX();
-                    self.ORA();
-                },
-                0x1E => {
-                    self.ABX();
-                    self.ASL();
-                },
+                0x1D => { self.ABX(); self.ORA(); },
+                0x1E => { self.ABX(); self.ASL(); },
                 0x1F => {},
-                0x20 => {
-                    self.ABS();
-                    self.JSR();
-                },
-                0x21 => {
-                    self.IDX();
-                    self.AND();
-                },
+                0x20 => { self.ABS(); self.JSR(); },
+                0x21 => { self.IDX(); self.AND(); },
                 0x22 => {},
                 0x23 => {},
-                0x24 => {
-                    self.ZPG();
-                    self.BIT();
-                },
-                0x25 => {
-                    self.ZPG();
-                    self.AND();
-                },
-                0x26 => {
-                    self.ZPG();
-                    self.ROL();
-                },
+                0x24 => { self.ZPG(); self.BIT(); },
+                0x25 => { self.ZPG(); self.AND(); },
+                0x26 => { self.ZPG(); self.ROL(); },
                 0x27 => {},
-                0x28 => {
-                    // self.IMP();
-                    self.PLP();
-                },
-                0x29 => {
-                    self.IMM();
-                    self.AND();
-                },
-                0x2A => {
-                    self.ACC();
-                    self.ROL();
-                },
+                0x28 => { self.PLP(); },
+                0x29 => { self.IMM(); self.AND(); },
+                0x2A => { self.ACC(); self.ROL(); },
                 0x2B => {},
-                0x2C => {
-                    self.ABS();
-                    self.BIT();
-                },
-                0x2D => {
-                    self.ABS();
-                    self.AND();
-                },
-                0x2E => {
-                    self.ABS();
-                    self.ROL();
-                },
+                0x2C => { self.ABS(); self.BIT(); },
+                0x2D => { self.ABS(); self.AND(); },
+                0x2E => { self.ABS(); self.ROL(); },
                 0x2F => {},
-                0x30 => {
-                    self.REL();
-                    self.BMI();
-                },
-                0x31 => {
-                    self.IDY();
-                    self.AND();
-                },
+                0x30 => { self.REL(); self.BMI(); },
+                0x31 => { self.IDY(); self.AND(); },
                 0x32 => {},
                 0x33 => {},
                 0x34 => {},
-                0x35 => {
-                    self.ZPX();
-                    self.AND();
-                },
+                0x35 => { self.ZPX(); self.AND(); },
                 0x36 => {},
                 0x37 => {},
-                0x38 => {
-                    // self.IMP();
-                    self.SEC();
-                },
-                0x39 => {
-                    self.ABY();
-                    self.AND();
-                },
+                0x38 => { self.SEC(); },
+                0x39 => { self.ABY(); self.AND(); },
                 0x3A => {},
                 0x3B => {},
                 0x3C => {},
-                0x3D => {
-                    self.ABX();
-                    self.AND();
-                },
-                0x3E => {
-                    self.ABX();
-                    self.ROL();
-                },
+                0x3D => { self.ABX(); self.AND(); },
+                0x3E => { self.ABX(); self.ROL(); },
                 0x3F => {},
-                0x40 => {
-                    // self.IMP();
-                    self.RTI();
-                },
-                0x41 => {
-                    self.IDX();
-                    self.EOR();
-                },
+                0x40 => { self.RTI(); },
+                0x41 => { self.IDX(); self.EOR(); },
                 0x42 => {},
                 0x43 => {},
                 0x44 => {},
-                0x45 => {
-                    self.ZPG();
-                    self.EOR();
-                },
-                0x46 => {
-                    self.ZPG();
-                    self.LSR();
-                },
+                0x45 => { self.ZPG(); self.EOR(); },
+                0x46 => { self.ZPG(); self.LSR(); },
                 0x47 => {},
-                0x48 => {
-                    // self.IMP();
-                    self.PHA();
-                },
-                0x49 => {
-                    self.IMM();
-                    self.EOR();
-                },
-                0x4A => {
-                    self.ACC();
-                    self.LSR();
-                },
+                0x48 => { self.PHA(); },
+                0x49 => { self.IMM(); self.EOR(); },
+                0x4A => { self.ACC(); self.LSR(); },
                 0x4B => {},
-                0x4C => {
-                    self.ABS();
-                    self.JMP();
-                },
-                0x4D => {
-                    self.ABS();
-                    self.EOR();
-                },
-                0x4E => {
-                    self.ABS();
-                    self.LSR();
-                },
+                0x4C => { self.ABS(); self.JMP(); },
+                0x4D => { self.ABS(); self.EOR(); },
+                0x4E => { self.ABS(); self.LSR(); },
                 0x4F => {},
-                0x50 => {
-                    self.REL();
-                    self.BVC();
-                },
-                0x51 => {
-                    self.IDY();
-                    self.EOR();
-                },
+                0x50 => { self.REL(); self.BVC(); },
+                0x51 => { self.IDY(); self.EOR(); },
                 0x52 => {},
                 0x53 => {},
                 0x54 => {},
-                0x55 => {
-                    self.ZPX();
-                    self.EOR();
-                },
-                0x56 => {
-                    self.ZPX();
-                    self.LSR();
-                },
+                0x55 => { self.ZPX(); self.EOR(); },
+                0x56 => { self.ZPX(); self.LSR(); },
                 0x57 => {},
-                0x58 => {
-                    // self.IMP();
-                    self.CLI();
-                },
-                0x59 => {
-                    self.ABY();
-                    self.EOR();
-                },
+                0x58 => { self.CLI(); },
+                0x59 => { self.ABY(); self.EOR(); },
                 0x5A => {},
                 0x5B => {},
                 0x5C => {},
-                0x5D => {
-                    self.ABX();
-                    self.EOR();
-                },
-                0x5E => {
-                    self.ABX();
-                    self.LSR();
-                },
+                0x5D => { self.ABX(); self.EOR(); },
+                0x5E => { self.ABX(); self.LSR(); },
                 0x5F => {},
-                0x60 => {
-                    // self.IMP();
-                    self.RTS();
-                },
-                0x61 => {
-                    self.IDX();
-                    self.ADC();
-                },
+                0x60 => { self.RTS(); },
+                0x61 => { self.IDX(); self.ADC(); },
                 0x62 => {},
                 0x63 => {},
                 0x64 => {},
-                0x65 => {
-                    self.ZPG();
-                    self.ADC();
-                },
-                0x66 => {
-                    self.ZPG();
-                    self.ROR();
-                },
+                0x65 => { self.ZPG(); self.ADC(); },
+                0x66 => { self.ZPG(); self.ROR(); },
                 0x67 => {},
-                0x68 => {
-                    // self.IMP();
-                    self.PLA();
-                },
-                0x69 => {
-                    self.IMM();
-                    self.ADC();
-                },
-                0x6A => {
-                    self.ACC();
-                    self.ROR();
-                },
+                0x68 => { self.PLA(); },
+                0x69 => { self.IMM(); self.ADC(); },
+                0x6A => { self.ACC(); self.ROR(); },
                 0x6B => {},
-                0x6C => {
-                    self.IND();
-                    self.JMP();
-                },
-                0x6D => {
-                    self.ABS();
-                    self.ADC();
-                },
-                0x6E => {
-                    self.ABS();
-                    self.ROR();
-                },
+                0x6C => { self.IND(); self.JMP(); },
+                0x6D => { self.ABS(); self.ADC(); },
+                0x6E => { self.ABS(); self.ROR(); },
                 0x6F => {},
-                0x70 => {
-                    self.REL();
-                    self.BVS();
-                },
-                0x71 => {
-                    self.IDY();
-                    self.ADC();
-                },
+                0x70 => { self.REL(); self.BVS(); },
+                0x71 => { self.IDY(); self.ADC(); },
                 0x72 => {},
                 0x73 => {},
                 0x74 => {},
-                0x75 => {
-                    self.ZPX();
-                    self.ADC();
-                },
-                0x76 => {
-                    self.ZPX();
-                    self.ROR();
-                },
+                0x75 => { self.ZPX(); self.ADC(); },
+                0x76 => { self.ZPX(); self.ROR(); },
                 0x77 => {},
-                0x78 => {
-                    // self.IMP();
-                    self.SEI();
-                },
-                0x79 => {
-                    self.ABY();
-                    self.ADC();
-                },
+                0x78 => { self.SEI(); },
+                0x79 => { self.ABY(); self.ADC(); },
                 0x7A => {},
                 0x7B => {},
                 0x7C => {},
-                0x7D => {
-                    self.ABX();
-                    self.ADC();
-                },
-                0x7E => {
-                    self.ABX();
-                    self.ROR();
-                },
+                0x7D => { self.ABX(); self.ADC(); },
+                0x7E => { self.ABX(); self.ROR(); },
                 0x7F => {},
                 0x80 => {},
-                0x81 => {
-                    self.IDX();
-                    self.STA();
-                },
+                0x81 => { self.IDX(); self.STA(); },
                 0x82 => {},
                 0x83 => {},
-                0x84 => {
-                    self.ZPG();
-                    self.STY();
-                },
-                0x85 => {
-                    self.ZPG();
-                    self.STA();
-                },
-                0x86 => {
-                    self.ZPG();
-                    self.STX();
-                },
+                0x84 => { self.ZPG(); self.STY(); },
+                0x85 => { self.ZPG(); self.STA(); },
+                0x86 => { self.ZPG(); self.STX(); },
                 0x87 => {},
-                0x88 => {
-                    // self.IMP();
-                    self.DEY();
-                },
+                0x88 => { self.DEY(); },
                 0x89 => {},
-                0x8A => {
-                    // self.IMP();
-                    self.TXA();
-                },
+                0x8A => { self.TXA(); },
                 0x8B => {},
-                0x8C => {
-                    self.ABS();
-                    self.STY();
-                },
-                0x8D => {
-                    self.ABS();
-                    self.STA();
-                },
-                0x8E => {
-                    self.ABS();
-                    self.STX();
-                },
+                0x8C => { self.ABS(); self.STY(); },
+                0x8D => { self.ABS(); self.STA(); },
+                0x8E => { self.ABS(); self.STX(); },
                 0x8F => {},
-                0x90 => {
-                    self.REL();
-                    self.BCC();
-                },
-                0x91 => {
-                    self.IDY();
-                    self.STA();
-                },
+                0x90 => { self.REL(); self.BCC(); },
+                0x91 => { self.IDY(); self.STA(); },
                 0x92 => {},
                 0x93 => {},
-                0x94 => {
-                    self.ZPX();
-                    self.STY();
-                },
-                0x95 => {
-                    self.ZPX();
-                    self.STA();
-                },
-                0x96 => {
-                    self.ZPY();
-                    self.STX();
-                },
+                0x94 => { self.ZPX(); self.STY(); },
+                0x95 => { self.ZPX(); self.STA(); },
+                0x96 => { self.ZPY(); self.STX(); },
                 0x97 => {},
-                0x98 => {
-                    // self.IMP();
-                    self.TYA();
-                },
-                0x99 => {
-                    self.ABY();
-                    self.STA();
-                },
-                0x9A => {
-                    // self.IMP();
-                    self.TXS();
-                },
+                0x98 => { self.TYA(); },
+                0x99 => { self.ABY(); self.STA(); },
+                0x9A => { self.TXS(); },
                 0x9B => {},
                 0x9C => {},
-                0x9D => {
-                    self.ABX();
-                    self.STA();
-                },
+                0x9D => { self.ABX(); self.STA(); },
                 0x9E => {},
                 0x9F => {},
-                0xA0 => {
-                    self.IMM();
-                    self.LDY();
-                },
-                0xA1 => {
-                    self.IDX();
-                    self.LDA();
-                },
-                0xA2 => {
-                    self.IMM();
-                    self.LDX();
-                },
+                0xA0 => { self.IMM(); self.LDY(); },
+                0xA1 => { self.IDX(); self.LDA(); },
+                0xA2 => { self.IMM(); self.LDX(); },
                 0xA3 => {},
-                0xA4 => {
-                    self.ZPG();
-                    self.LDY();
-                },
-                0xA5 => {
-                    self.ZPG();
-                    self.LDA();
-                },
-                0xA6 => {
-                    self.ZPG();
-                    self.LDX();
-                },
+                0xA4 => { self.ZPG(); self.LDY(); },
+                0xA5 => { self.ZPG(); self.LDA(); },
+                0xA6 => { self.ZPG(); self.LDX(); },
                 0xA7 => {},
-                0xA8 => {
-                    // self.IMP();
-                    self.TAY();
-                },
-                0xA9 => {
-                    // self.IMP();
-                    self.LDA();
-                },
-                0xAA => {
-                    // self.IMP();
-                    self.TAX();
-                },
+                0xA8 => { self.TAY(); },
+                0xA9 => { self.LDA(); },
+                0xAA => { self.TAX(); },
                 0xAB => {},
-                0xAC => {
-                    self.ABS();
-                    self.LDY();
-                },
-                0xAD => {
-                    self.ABS();
-                    self.LDA();
-                },
-                0xAE => {
-                    self.ABS();
-                    self.LDX();
-                },
+                0xAC => { self.ABS(); self.LDY(); },
+                0xAD => { self.ABS(); self.LDA(); },
+                0xAE => { self.ABS(); self.LDX(); },
                 0xAF => {},
-                0xB0 => {
-                    self.REL();
-                    self.BCS();
-                },
-                0xB1 => {
-                    self.IDY();
-                    self.LDA();
-                },
+                0xB0 => { self.REL(); self.BCS(); },
+                0xB1 => { self.IDY(); self.LDA(); },
                 0xB2 => {},
                 0xB3 => {},
-                0xB4 => {
-                    self.ZPX();
-                    self.LDY();
-                },
-                0xB5 => {
-                    self.ZPX();
-                    self.LDA();
-                },
-                0xB6 => {
-                    self.ZPY();
-                    self.LDX();
-                },
+                0xB4 => { self.ZPX(); self.LDY(); },
+                0xB5 => { self.ZPX(); self.LDA(); },
+                0xB6 => { self.ZPY(); self.LDX(); },
                 0xB7 => {},
-                0xB8 => {
-                    // self.IMP();
-                    self.CLV();
-                },
-                0xB9 => {
-                    self.ABY();
-                    self.LDA();
-                },
-                0xBA => {
-                    // self.IMP();
-                    self.TSX();
-                },
+                0xB8 => { self.CLV(); },
+                0xB9 => { self.ABY(); self.LDA(); },
+                0xBA => { self.TSX(); },
                 0xBB => {},
-                0xBC => {
-                    self.ABX();
-                    self.LDY();
-                },
-                0xBD => {
-                    self.ABX();
-                    self.LDA();
-                },
-                0xBE => {
-                    self.ABY();
-                    self.LDX();
-                },
+                0xBC => { self.ABX(); self.LDY(); },
+                0xBD => { self.ABX(); self.LDA(); },
+                0xBE => { self.ABY(); self.LDX(); },
                 0xBF => {},
-                0xC0 => {
-                    self.IMM();
-                    self.CPY();
-                },
-                0xC1 => {
-                    self.IDX();
-                    self.CMP();
-                },
+                0xC0 => { self.IMM(); self.CPY(); },
+                0xC1 => { self.IDX(); self.CMP(); },
                 0xC2 => {},
                 0xC3 => {},
-                0xC4 => {
-                    self.ZPG();
-                    self.CPY();
-                },
-                0xC5 => {
-                    self.ZPG();
-                    self.CMP();
-                },
-                0xC6 => {
-                    self.ZPG();
-                    self.DEC();
-                },
+                0xC4 => { self.ZPG(); self.CPY(); },
+                0xC5 => { self.ZPG(); self.CMP(); },
+                0xC6 => { self.ZPG(); self.DEC(); },
                 0xC7 => {},
-                0xC8 => {
-                    // self.IMP();
-                    self.INY();
-                },
+                0xC8 => { self.INY(); },
                 0xC9 => {},
-                0xCA => {
-                    // self.IMP();
-                    self.DEX();
-                },
+                0xCA => { self.DEX(); },
                 0xCB => {},
-                0xCC => {
-                    self.ABS();
-                    self.CPY();
-                },
-                0xCD => {
-                    self.ABS();
-                    self.CMP();
-                },
-                0xCE => {
-                    self.ABS();
-                    self.DEC();
-                },
+                0xCC => { self.ABS(); self.CPY(); },
+                0xCD => { self.ABS(); self.CMP(); },
+                0xCE => { self.ABS(); self.DEC(); },
                 0xCF => {},
-                0xD0 => {
-                    self.REL();
-                    self.BNE();
-                },
-                0xD1 => {
-                    self.IDY();
-                    self.CMP();
-                },
+                0xD0 => { self.REL(); self.BNE(); },
+                0xD1 => { self.IDY(); self.CMP(); },
                 0xD2 => {},
                 0xD3 => {},
                 0xD4 => {},
-                0xD5 => {
-                    self.ZPX();
-                    self.CMP();
-                },
-                0xD6 => {
-                    self.ZPX();
-                    self.DEC();
-                },
+                0xD5 => { self.ZPX(); self.CMP(); },
+                0xD6 => { self.ZPX(); self.DEC(); },
                 0xD7 => {},
-                0xD8 => {
-                    // self.IMP();
-                    self.CLD();
-                },
-                0xD9 => {
-                    self.ABY();
-                    self.CMP();
-                },
+                0xD8 => { self.CLD(); },
+                0xD9 => { self.ABY(); self.CMP(); },
                 0xDA => {},
                 0xDB => {},
                 0xDC => {},
-                0xDD => {
-                    self.ABX();
-                    self.CMP();
-                },
-                0xDE => {
-                    self.ABX();
-                    self.DEC();
-                },
+                0xDD => { self.ABX(); self.CMP(); },
+                0xDE => { self.ABX(); self.DEC(); },
                 0xDF => {},
-                0xE0 => {
-                    self.IMM();
-                    self.CPX();
-                },
-                0xE1 => {
-                    self.IDX();
-                    self.SBC();
-                },
+                0xE0 => { self.IMM(); self.CPX(); },
+                0xE1 => { self.IDX(); self.SBC(); },
                 0xE2 => {},
                 0xE3 => {},
-                0xE4 => {
-                    self.ZPG();
-                    self.CPX();
-                },
-                0xE5 => {
-                    self.ZPG();
-                    self.SBC();
-                },
-                0xE6 => {
-                    self.ZPG();
-                    self.INC();
-                },
+                0xE4 => { self.ZPG(); self.CPX(); },
+                0xE5 => { self.ZPG(); self.SBC(); },
+                0xE6 => { self.ZPG(); self.INC(); },
                 0xE7 => {},
-                0xE8 => {
-                    // self.IMP();
-                    self.INX();
-                },
-                0xE9 => {
-                    self.IMM();
-                    self.SBC();
-                },
-                0xEA => {
-                    // self.IMP();
-                    self.NOP();
-                },
+                0xE8 => { self.INX(); },
+                0xE9 => { self.IMM(); self.SBC(); },
+                0xEA => { self.NOP(); },
                 0xEB => {},
-                0xEC => {
-                    self.ABS();
-                    self.CPX();
-                },
-                0xED => {
-                    self.ABS();
-                    self.SBC();
-                },
-                0xEE => {
-                    self.ABS();
-                    self.INC();
-                },
+                0xEC => { self.ABS(); self.CPX(); },
+                0xED => { self.ABS(); self.SBC(); },
+                0xEE => { self.ABS(); self.INC(); },
                 0xEF => {},
-                0xF0 => {
-                    self.REL();
-                    self.BEQ();
-                },
-                0xF1 => {
-                    self.IDY();
-                    self.SBC();
-                },
+                0xF0 => { self.REL(); self.BEQ(); },
+                0xF1 => { self.IDY(); self.SBC(); },
                 0xF2 => {},
                 0xF3 => {},
                 0xF4 => {},
-                0xF5 => {
-                    self.ZPX();
-                    self.SBC();
-                },
-                0xF6 => {
-                    self.ZPX();
-                    self.INC();
-                },
+                0xF5 => { self.ZPX(); self.SBC(); },
+                0xF6 => { self.ZPX(); self.INC(); },
                 0xF7 => {},
-                0xF8 => {
-                    // self.IMP();
-                    self.SED();
-                },
-                0xF9 => {
-                    self.ABY();
-                    self.SBC();
-                },
+                0xF8 => { self.SED(); },
+                0xF9 => { self.ABY(); self.SBC(); },
                 0xFA => {},
                 0xFB => {},
                 0xFC => {},
-                0xFD => {
-                    self.ABX();
-                    self.SBC();
-                },
-                0xFE => {
-                    self.ABX();
-                    self.INC();
-                },
+                0xFD => { self.ABX(); self.SBC(); },
+                0xFE => { self.ABX(); self.INC(); },
                 0xFF => {},
             }
             // cycles6502[self.opcode]();
